@@ -1,0 +1,47 @@
+-- Master migration runner
+-- Run as: nettapu_migrator
+-- Usage: psql -U nettapu_migrator -d nettapu -f /migrations/run_all.sql
+
+\echo '=== Migration 001: Create schemas ==='
+\i /migrations/001_create_schemas.sql
+
+\echo '=== Migration 002: Create enums ==='
+\i /migrations/002_create_enums.sql
+
+\echo '=== Migration 003: Auth tables ==='
+\i /migrations/003_auth_tables.sql
+
+\echo '=== Migration 004: Listings tables ==='
+\i /migrations/004_listings_tables.sql
+
+\echo '=== Migration 005: Auctions tables ==='
+\i /migrations/005_auctions_tables.sql
+
+\echo '=== Migration 006: Payments tables ==='
+\i /migrations/006_payments_tables.sql
+
+\echo '=== Migration 007: CRM tables ==='
+\i /migrations/007_crm_tables.sql
+
+\echo '=== Migration 008: Admin tables ==='
+\i /migrations/008_admin_tables.sql
+
+\echo '=== Migration 009: Integrations tables ==='
+\i /migrations/009_integrations_tables.sql
+
+\echo '=== Migration 010: Campaigns tables ==='
+\i /migrations/010_campaigns_tables.sql
+
+\echo '=== Migration 011: Immutability triggers ==='
+\i /migrations/011_triggers_immutability.sql
+
+\echo '=== Migration 012: Append-only triggers ==='
+\i /migrations/012_triggers_append_only.sql
+
+\echo '=== Migration 013: Indexes ==='
+\i /migrations/013_indexes.sql
+
+\echo '=== Migration 014: Revoke DDL from app role ==='
+\i /migrations/014_revoke_ddl_from_app.sql
+
+\echo '=== All migrations completed successfully ==='

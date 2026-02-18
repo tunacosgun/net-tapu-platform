@@ -1,0 +1,20 @@
+{
+  "name": "net-tapu-platform",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Real Estate & Land Sales Platform with Live Online Auction System",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "db:up": "docker compose up postgres redis -d",
+    "db:migrate": "docker compose exec postgres psql -U nettapu_migrator -d nettapu -f /migrations/run_all.sql",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:rebuild": "docker compose up -d --build"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
