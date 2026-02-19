@@ -55,7 +55,7 @@ async function main(): Promise<void> {
   try {
     const resp = await fetch(`${API_URL}/metrics`);
     const text = await resp.text();
-    const match = text.match(/settlement_lock_failures_total\s+([\d.]+)/);
+    const match = text.match(/settlement_lock_failures_total(?:\{[^}]*\})?\s+([\d.]+)/);
     lockFailuresBefore = match ? parseFloat(match[1]) : 0;
   } catch {
     // Metrics endpoint may not be available
@@ -143,7 +143,7 @@ async function main(): Promise<void> {
   try {
     const resp = await fetch(`${API_URL}/metrics`);
     const text = await resp.text();
-    const match = text.match(/settlement_lock_failures_total\s+([\d.]+)/);
+    const match = text.match(/settlement_lock_failures_total(?:\{[^}]*\})?\s+([\d.]+)/);
     const lockFailuresAfter = match ? parseFloat(match[1]) : 0;
     const newLockFailures = lockFailuresAfter - lockFailuresBefore;
     info('New lock failures', `${newLockFailures}`);

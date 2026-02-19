@@ -48,7 +48,7 @@ async function main(): Promise<void> {
   try {
     const resp = await fetch(`${API_URL}/metrics`);
     const text = await resp.text();
-    const match = text.match(/settlement_failed_total\s+([\d.]+)/);
+    const match = text.match(/settlement_failed_total(?:\{[^}]*\})?\s+([\d.]+)/);
     failedBefore = match ? parseFloat(match[1]) : 0;
   } catch {
     // Metrics endpoint may not be available
@@ -202,7 +202,7 @@ async function main(): Promise<void> {
   try {
     const resp = await fetch(`${API_URL}/metrics`);
     const text = await resp.text();
-    const match = text.match(/settlement_failed_total\s+([\d.]+)/);
+    const match = text.match(/settlement_failed_total(?:\{[^}]*\})?\s+([\d.]+)/);
     const failedAfter = match ? parseFloat(match[1]) : 0;
     check('settlement_failed_total incremented', failedAfter > failedBefore, `before=${failedBefore}, after=${failedAfter}`);
   } catch {
