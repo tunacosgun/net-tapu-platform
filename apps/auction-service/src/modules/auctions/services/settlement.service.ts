@@ -13,7 +13,9 @@ import { AuctionStatus } from '@nettapu/shared';
 import {
   PAYMENT_SERVICE,
   IPaymentService,
+  CircuitOpenError,
 } from './payment.service';
+import { executeWithRetry } from '../utils/db-retry.util';
 
 // ── Manifest JSONB types ──────────────────────────────────────
 
@@ -98,7 +100,13 @@ export class SettlementService {
       });
       if (existingManifest) {
         await qr.rollbackTransaction();
-        this.logger.warn(`Manifest already exists for auction ${auctionId}, skipping initiation`);
+        this.logger.warn(
+          JSON.stringify({
+            event: 'settlement_duplicate_manifest',
+            auction_id: auctionId,
+            existing_manifest_id: existingManifest.id,
+          }),
+        );
         return null;
       }
 
@@ -125,7 +133,13 @@ export class SettlementService {
 
         if (!deposit || deposit.status !== 'held') {
           this.logger.warn(
-            `Skipping participant ${participant.userId}: deposit ${participant.depositId} status=${deposit?.status ?? 'not_found'}`,
+            JSON.stringify({
+              event: 'settlement_skip_participant',
+              auction_id: auctionId,
+              user_id: participant.userId,
+              deposit_id: participant.depositId,
+              deposit_status: deposit?.status ?? 'not_found',
+            }),
           );
           continue;
         }
@@ -180,8 +194,14 @@ export class SettlementService {
       await qr.commitTransaction();
 
       this.logger.log(
-        `Settlement initiated for auction ${auctionId}: ${items.length} items ` +
-        `(winner=${auction.winnerId ?? 'none'}, finalPrice=${auction.finalPrice ?? 'none'})`,
+        JSON.stringify({
+          event: 'settlement_started',
+          auction_id: auctionId,
+          manifest_id: manifest.id,
+          items_total: items.length,
+          winner_id: auction.winnerId ?? null,
+          final_price: auction.finalPrice ?? null,
+        }),
       );
 
       return manifest;
@@ -226,7 +246,14 @@ export class SettlementService {
     if (deposit.status === 'captured') {
       item.status = 'acknowledged';
       item.acknowledged_at = new Date().toISOString();
-      this.logger.log(`Deposit ${item.deposit_id} already captured, marking acknowledged`);
+      this.logger.log(
+        JSON.stringify({
+          event: 'settlement_item_idempotent',
+          action: 'capture',
+          deposit_id: item.deposit_id,
+          deposit_status: 'captured',
+        }),
+      );
       return item;
     }
 
@@ -261,13 +288,32 @@ export class SettlementService {
 
       item.pos_reference = result.posReference;
 
-      // Record transition in DB
-      await this.recordCaptureInDb(deposit, item);
+      // Record transition in DB (with transient failure retry)
+      await executeWithRetry(
+        () => this.recordCaptureInDb(deposit, item),
+        { context: `capture_db:${item.deposit_id}` },
+      );
 
       item.status = 'acknowledged';
       item.acknowledged_at = new Date().toISOString();
       return item;
     } catch (err) {
+      // CircuitOpenError — POS was not called, safe to retry without re-check
+      if (err instanceof CircuitOpenError) {
+        item.status = 'failed';
+        item.failure_reason = err.message;
+        item.retry_count++;
+        this.logger.warn(
+          JSON.stringify({
+            event: 'settlement_item_circuit_open',
+            action: 'capture',
+            deposit_id: item.deposit_id,
+            retry_count: item.retry_count,
+          }),
+        );
+        return item;
+      }
+
       // CRITICAL: POS may have succeeded but DB write failed.
       // Re-check deposit status to detect this case.
       const recheckDeposit = await this.depositRepo.findOne({ where: { id: item.deposit_id } });
@@ -276,7 +322,12 @@ export class SettlementService {
         item.status = 'acknowledged';
         item.acknowledged_at = new Date().toISOString();
         this.logger.warn(
-          `Deposit ${item.deposit_id} capture: POS+DB completed despite error: ${(err as Error).message}`,
+          JSON.stringify({
+            event: 'settlement_item_recovered',
+            action: 'capture',
+            deposit_id: item.deposit_id,
+            error: (err as Error).message,
+          }),
         );
         return item;
       }
@@ -285,7 +336,14 @@ export class SettlementService {
       item.failure_reason = (err as Error).message;
       item.retry_count++;
       this.logger.error(
-        `Capture failed for deposit ${item.deposit_id} (retry ${item.retry_count}/${MAX_RETRIES}): ${(err as Error).message}`,
+        JSON.stringify({
+          event: 'settlement_item_failed',
+          action: 'capture',
+          deposit_id: item.deposit_id,
+          retry_count: item.retry_count,
+          max_retries: MAX_RETRIES,
+          error: (err as Error).message,
+        }),
       );
       return item;
     }
@@ -372,7 +430,14 @@ export class SettlementService {
     if (deposit.status === 'refunded') {
       item.status = 'acknowledged';
       item.acknowledged_at = new Date().toISOString();
-      this.logger.log(`Deposit ${item.deposit_id} already refunded, marking acknowledged`);
+      this.logger.log(
+        JSON.stringify({
+          event: 'settlement_item_idempotent',
+          action: 'refund',
+          deposit_id: item.deposit_id,
+          deposit_status: 'refunded',
+        }),
+      );
       return item;
     }
 
@@ -389,8 +454,11 @@ export class SettlementService {
       return item;
     }
 
-    // Step 1: Transition held → refund_pending + create refund record (atomic TX)
-    const initiated = await this.recordRefundInitiationInDb(deposit, item);
+    // Step 1: Transition held → refund_pending + create refund record (atomic TX, with retry)
+    const initiated = await executeWithRetry(
+      () => this.recordRefundInitiationInDb(deposit, item),
+      { context: `refund_init_db:${item.deposit_id}` },
+    );
     if (!initiated) {
       // Deposit was concurrently transitioned — re-read and check
       const recheck = await this.depositRepo.findOne({ where: { id: item.deposit_id } });
@@ -515,13 +583,32 @@ export class SettlementService {
 
       item.pos_reference = result.posRefundId;
 
-      // Finalize in DB: refund_pending → refunded
-      await this.recordRefundCompletionInDb(deposit, item, result.posRefundId);
+      // Finalize in DB: refund_pending → refunded (with transient failure retry)
+      await executeWithRetry(
+        () => this.recordRefundCompletionInDb(deposit, item, result.posRefundId),
+        { context: `refund_complete_db:${item.deposit_id}` },
+      );
 
       item.status = 'acknowledged';
       item.acknowledged_at = new Date().toISOString();
       return item;
     } catch (err) {
+      // CircuitOpenError — POS was not called, safe to retry without re-check
+      if (err instanceof CircuitOpenError) {
+        item.status = 'failed';
+        item.failure_reason = err.message;
+        item.retry_count++;
+        this.logger.warn(
+          JSON.stringify({
+            event: 'settlement_item_circuit_open',
+            action: 'refund',
+            deposit_id: item.deposit_id,
+            retry_count: item.retry_count,
+          }),
+        );
+        return item;
+      }
+
       // CRITICAL: POS may have succeeded but DB write failed.
       // Re-check deposit status to detect this case.
       const recheckDeposit = await this.depositRepo.findOne({ where: { id: item.deposit_id } });
@@ -529,7 +616,12 @@ export class SettlementService {
         item.status = 'acknowledged';
         item.acknowledged_at = new Date().toISOString();
         this.logger.warn(
-          `Deposit ${item.deposit_id} refund: POS+DB completed despite error: ${(err as Error).message}`,
+          JSON.stringify({
+            event: 'settlement_item_recovered',
+            action: 'refund',
+            deposit_id: item.deposit_id,
+            error: (err as Error).message,
+          }),
         );
         return item;
       }
@@ -538,7 +630,14 @@ export class SettlementService {
       item.failure_reason = (err as Error).message;
       item.retry_count++;
       this.logger.error(
-        `Refund failed for deposit ${item.deposit_id} (retry ${item.retry_count}/${MAX_RETRIES}): ${(err as Error).message}`,
+        JSON.stringify({
+          event: 'settlement_item_failed',
+          action: 'refund',
+          deposit_id: item.deposit_id,
+          retry_count: item.retry_count,
+          max_retries: MAX_RETRIES,
+          error: (err as Error).message,
+        }),
       );
       return item;
     }
@@ -688,8 +787,13 @@ export class SettlementService {
 
       await qr.commitTransaction();
       this.logger.log(
-        `Settlement completed for auction ${manifest.auctionId}: ` +
-        `${acknowledgedCount}/${manifest.itemsTotal} items acknowledged`,
+        JSON.stringify({
+          event: 'settlement_completed',
+          auction_id: manifest.auctionId,
+          manifest_id: manifest.id,
+          items_total: manifest.itemsTotal,
+          items_acknowledged: acknowledgedCount,
+        }),
       );
       return 'completed';
     } catch (err) {
@@ -749,9 +853,15 @@ export class SettlementService {
 
       await qr.commitTransaction();
       this.logger.error(
-        `Settlement FAILED for auction ${manifest.auctionId}: ` +
-        `${failedItems.length} items exceeded max retries, ` +
-        `${acknowledgedCount}/${manifest.itemsTotal} acknowledged`,
+        JSON.stringify({
+          event: 'settlement_escalated',
+          auction_id: manifest.auctionId,
+          manifest_id: manifest.id,
+          items_total: manifest.itemsTotal,
+          items_acknowledged: acknowledgedCount,
+          failed_count: failedItems.length,
+          failed_deposits: failedItems.map((i) => i.deposit_id),
+        }),
       );
       return 'failed';
     } catch (err) {

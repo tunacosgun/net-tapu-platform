@@ -3,6 +3,7 @@ import {
   Registry,
   Counter,
   Gauge,
+  Histogram,
   collectDefaultMetrics,
 } from 'prom-client';
 
@@ -29,6 +30,14 @@ export class MetricsService {
   readonly settlementItemFailuresTotal: Counter;
   readonly adminSettlementRetriesTotal: Counter;
   readonly reconciliationFailuresTotal: Counter;
+
+  // Phase 11: Production Hardening metrics
+  readonly settlementPosTimeoutsTotal: Counter;
+  readonly settlementPosCircuitTripsTotal: Counter;
+  readonly settlementPosCircuitState: Gauge;
+  readonly settlementLockFailuresTotal: Counter;
+  readonly settlementBacklogGauge: Gauge;
+  readonly settlementWorkerDurationMs: Histogram;
 
   constructor() {
     this.registry = new Registry();
@@ -150,6 +159,45 @@ export class MetricsService {
     this.reconciliationFailuresTotal = new Counter({
       name: 'reconciliation_failures_total',
       help: 'Total reconciliation check failures',
+      registers: [this.registry],
+    });
+
+    // Phase 11: Production Hardening metrics
+
+    this.settlementPosTimeoutsTotal = new Counter({
+      name: 'settlement_pos_timeouts_total',
+      help: 'Total POS call timeouts (5s threshold)',
+      registers: [this.registry],
+    });
+
+    this.settlementPosCircuitTripsTotal = new Counter({
+      name: 'settlement_pos_circuit_trips_total',
+      help: 'Total POS circuit breaker trips (CLOSED/HALF_OPEN → OPEN)',
+      registers: [this.registry],
+    });
+
+    this.settlementPosCircuitState = new Gauge({
+      name: 'settlement_pos_circuit_state',
+      help: 'POS circuit breaker state (0=CLOSED, 1=HALF_OPEN, 2=OPEN)',
+      registers: [this.registry],
+    });
+
+    this.settlementLockFailuresTotal = new Counter({
+      name: 'settlement_lock_failures_total',
+      help: 'Total Redis lock acquisition failures in settlement worker',
+      registers: [this.registry],
+    });
+
+    this.settlementBacklogGauge = new Gauge({
+      name: 'settlement_backlog_gauge',
+      help: 'Number of active manifests waiting to be processed',
+      registers: [this.registry],
+    });
+
+    this.settlementWorkerDurationMs = new Histogram({
+      name: 'settlement_worker_duration_ms',
+      help: 'Settlement worker tick duration in milliseconds',
+      buckets: [50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000],
       registers: [this.registry],
     });
   }
