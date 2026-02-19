@@ -27,6 +27,8 @@ export class MetricsService {
   readonly settlementCapturesTotal: Counter;
   readonly settlementRefundsTotal: Counter;
   readonly settlementItemFailuresTotal: Counter;
+  readonly adminSettlementRetriesTotal: Counter;
+  readonly reconciliationFailuresTotal: Counter;
 
   constructor() {
     this.registry = new Registry();
@@ -136,6 +138,18 @@ export class MetricsService {
       name: 'settlement_item_failures_total',
       help: 'Total per-item POS failures by action',
       labelNames: ['action'] as const,
+      registers: [this.registry],
+    });
+
+    this.adminSettlementRetriesTotal = new Counter({
+      name: 'admin_settlement_retries_total',
+      help: 'Total admin-initiated settlement retries',
+      registers: [this.registry],
+    });
+
+    this.reconciliationFailuresTotal = new Counter({
+      name: 'reconciliation_failures_total',
+      help: 'Total reconciliation check failures',
       registers: [this.registry],
     });
   }

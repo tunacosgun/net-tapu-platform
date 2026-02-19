@@ -18,6 +18,8 @@ import { SettlementService } from './services/settlement.service';
 import { PAYMENT_SERVICE, MockPaymentService } from './services/payment.service';
 import { BidController } from './controllers/bid.controller';
 import { AuctionController } from './controllers/auction.controller';
+import { AdminSettlementController } from './controllers/admin-settlement.controller';
+import { AdminFinanceController } from './controllers/admin-finance.controller';
 import { AuctionGateway } from './gateways/auction.gateway';
 import { AuctionEndingWorker } from './workers/auction-ending.worker';
 import { SettlementWorker } from './workers/settlement.worker';
@@ -38,7 +40,7 @@ import { SettlementWorker } from './workers/settlement.worker';
       Refund,
     ]),
   ],
-  controllers: [AuctionController, BidController],
+  controllers: [AuctionController, BidController, AdminSettlementController, AdminFinanceController],
   providers: [
     AuctionService,
     BidService,
