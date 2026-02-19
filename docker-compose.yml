@@ -44,6 +44,10 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://nettapu_app:${POSTGRES_APP_PASSWORD:-app_secret_change_me}@postgres:5432/nettapu
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret_change_me}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production_min_32_chars!!}
+      JWT_ACCESS_EXPIRATION: 15m
+      JWT_REFRESH_EXPIRATION_DAYS: "7"
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
       PORT: 3000
     ports:
       - "3000:3000"
@@ -52,6 +56,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/v1/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
 
   auction-service:
@@ -63,6 +73,8 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://nettapu_app:${POSTGRES_APP_PASSWORD:-app_secret_change_me}@postgres:5432/nettapu
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret_change_me}@redis:6379
+      JWT_SECRET: ${JWT_SECRET:-change_me_in_production_min_32_chars!!}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
       PORT: 3001
     ports:
       - "3001:3001"
@@ -71,6 +83,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/api/v1/auctions/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
 
   nginx:
@@ -83,8 +101,10 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
     depends_on:
-      - monolith
-      - auction-service
+      monolith:
+        condition: service_healthy
+      auction-service:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
