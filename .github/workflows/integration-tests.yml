@@ -217,13 +217,14 @@ jobs:
             -f database/migrations/run_all.sql
 
       - name: Start auction service
+        env:
+          POS_FAIL_MODE: ${{ matrix.pos_fail_mode || 'false' }}
         run: |
           DATABASE_URL=postgresql://nettapu_app:app_secret_change_me@localhost:5432/nettapu \
           REDIS_URL=redis://localhost:6379 \
           JWT_SECRET=ci_integration_test_secret_32chars!! \
           CORS_ORIGIN=http://localhost:3000 \
           SNIPER_EXTENSION_SECONDS=60 \
-          POS_FAIL_MODE=${{ matrix.pos_fail_mode || 'false' }} \
           PORT=3001 \
           node apps/auction-service/dist/main.js &
 
