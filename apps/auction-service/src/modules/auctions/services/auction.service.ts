@@ -18,6 +18,9 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   [AuctionStatus.SCHEDULED]: [AuctionStatus.LIVE],
   [AuctionStatus.LIVE]: [AuctionStatus.ENDING, AuctionStatus.CANCELLED],
   [AuctionStatus.ENDING]: [AuctionStatus.ENDED, AuctionStatus.CANCELLED],
+  [AuctionStatus.ENDED]: [AuctionStatus.SETTLING],
+  [AuctionStatus.SETTLING]: [AuctionStatus.SETTLED, AuctionStatus.SETTLEMENT_FAILED],
+  [AuctionStatus.SETTLEMENT_FAILED]: [AuctionStatus.SETTLED],
 };
 
 @Injectable()

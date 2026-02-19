@@ -62,4 +62,7 @@
 \echo '=== Migration 020: Sniper protection and ending transitions ==='
 \i /migrations/020_sniper_protection_and_ending_transitions.sql
 
+\echo '=== Migration 021: Settlement worker index ==='
+\i /migrations/021_settlement_worker_index.sql
+
 \echo '=== All migrations completed successfully ==='

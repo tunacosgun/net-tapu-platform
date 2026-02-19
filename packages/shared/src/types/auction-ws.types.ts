@@ -53,13 +53,41 @@ export interface AuctionEndedMessage {
   final_price: string;
 }
 
+export interface AuctionSettlementPendingMessage {
+  type: 'AUCTION_SETTLEMENT_PENDING';
+  auction_id: string;
+  manifest_id: string;
+  items_total: number;
+}
+
+export interface AuctionSettlementProgressMessage {
+  type: 'AUCTION_SETTLEMENT_PROGRESS';
+  auction_id: string;
+  items_total: number;
+  items_acknowledged: number;
+}
+
+export interface AuctionSettledMessage {
+  type: 'AUCTION_SETTLED';
+  auction_id: string;
+}
+
+export interface AuctionSettlementFailedMessage {
+  type: 'AUCTION_SETTLEMENT_FAILED';
+  auction_id: string;
+}
+
 export type ServerMessage =
   | AuctionStateMessage
   | BidAcceptedMessage
   | BidRejectedMessage
   | AuctionExtendedMessage
   | AuctionEndingMessage
-  | AuctionEndedMessage;
+  | AuctionEndedMessage
+  | AuctionSettlementPendingMessage
+  | AuctionSettlementProgressMessage
+  | AuctionSettledMessage
+  | AuctionSettlementFailedMessage;
 
 // ============================================================
 // CLIENT → SERVER MESSAGES

@@ -27,6 +27,10 @@ import {
   AuctionExtendedMessage,
   AuctionEndingMessage,
   AuctionEndedMessage,
+  AuctionSettlementPendingMessage,
+  AuctionSettlementProgressMessage,
+  AuctionSettledMessage,
+  AuctionSettlementFailedMessage,
   WsContextInterceptor,
 } from '@nettapu/shared';
 import { MetricsService } from '../../../metrics/metrics.service';
@@ -421,5 +425,21 @@ export class AuctionGateway
 
   broadcastAuctionEnded(auctionId: string, data: AuctionEndedMessage): void {
     this.server.to(`auction:${auctionId}`).emit('auction_ended', data);
+  }
+
+  broadcastSettlementPending(auctionId: string, data: AuctionSettlementPendingMessage): void {
+    this.server.to(`auction:${auctionId}`).emit('auction_settlement_pending', data);
+  }
+
+  broadcastSettlementProgress(auctionId: string, data: AuctionSettlementProgressMessage): void {
+    this.server.to(`auction:${auctionId}`).emit('auction_settlement_progress', data);
+  }
+
+  broadcastSettlementCompleted(auctionId: string, data: AuctionSettledMessage): void {
+    this.server.to(`auction:${auctionId}`).emit('auction_settled', data);
+  }
+
+  broadcastSettlementFailed(auctionId: string, data: AuctionSettlementFailedMessage): void {
+    this.server.to(`auction:${auctionId}`).emit('auction_settlement_failed', data);
   }
 }

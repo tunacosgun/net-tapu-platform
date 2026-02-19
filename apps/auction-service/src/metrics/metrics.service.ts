@@ -20,6 +20,13 @@ export class MetricsService {
   readonly auctionExtensionsTotal: Counter;
   readonly auctionEndingsTotal: Counter;
   readonly auctionStateTransitionsTotal: Counter;
+  readonly settlementInitiatedTotal: Counter;
+  readonly settlementCompletedTotal: Counter;
+  readonly settlementFailedTotal: Counter;
+  readonly settlementExpiredTotal: Counter;
+  readonly settlementCapturesTotal: Counter;
+  readonly settlementRefundsTotal: Counter;
+  readonly settlementItemFailuresTotal: Counter;
 
   constructor() {
     this.registry = new Registry();
@@ -86,6 +93,49 @@ export class MetricsService {
       name: 'auction_state_transitions_total',
       help: 'Total auction state transitions by from/to status',
       labelNames: ['from', 'to'] as const,
+      registers: [this.registry],
+    });
+
+    this.settlementInitiatedTotal = new Counter({
+      name: 'settlement_initiated_total',
+      help: 'Total ENDED → SETTLING transitions',
+      registers: [this.registry],
+    });
+
+    this.settlementCompletedTotal = new Counter({
+      name: 'settlement_completed_total',
+      help: 'Total SETTLING → SETTLED transitions',
+      registers: [this.registry],
+    });
+
+    this.settlementFailedTotal = new Counter({
+      name: 'settlement_failed_total',
+      help: 'Total SETTLING → SETTLEMENT_FAILED transitions',
+      registers: [this.registry],
+    });
+
+    this.settlementExpiredTotal = new Counter({
+      name: 'settlement_expired_total',
+      help: 'Total settlement manifest 48h expiries',
+      registers: [this.registry],
+    });
+
+    this.settlementCapturesTotal = new Counter({
+      name: 'settlement_captures_total',
+      help: 'Total successful deposit captures',
+      registers: [this.registry],
+    });
+
+    this.settlementRefundsTotal = new Counter({
+      name: 'settlement_refunds_total',
+      help: 'Total successful deposit refunds',
+      registers: [this.registry],
+    });
+
+    this.settlementItemFailuresTotal = new Counter({
+      name: 'settlement_item_failures_total',
+      help: 'Total per-item POS failures by action',
+      labelNames: ['action'] as const,
       registers: [this.registry],
     });
   }

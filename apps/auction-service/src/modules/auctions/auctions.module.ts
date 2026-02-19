@@ -7,13 +7,20 @@ import { BidRejection } from './entities/bid-rejection.entity';
 import { BidCorrection } from './entities/bid-correction.entity';
 import { AuctionConsent } from './entities/auction-consent.entity';
 import { SettlementManifest } from './entities/settlement-manifest.entity';
+import { Deposit } from './entities/deposit.entity';
+import { DepositTransition } from './entities/deposit-transition.entity';
+import { PaymentLedger } from './entities/payment-ledger.entity';
+import { Refund } from './entities/refund.entity';
 import { BidService } from './services/bid.service';
 import { AuctionService } from './services/auction.service';
 import { RedisLockService } from './services/redis-lock.service';
+import { SettlementService } from './services/settlement.service';
+import { PAYMENT_SERVICE, MockPaymentService } from './services/payment.service';
 import { BidController } from './controllers/bid.controller';
 import { AuctionController } from './controllers/auction.controller';
 import { AuctionGateway } from './gateways/auction.gateway';
 import { AuctionEndingWorker } from './workers/auction-ending.worker';
+import { SettlementWorker } from './workers/settlement.worker';
 
 @Module({
   imports: [
@@ -25,10 +32,23 @@ import { AuctionEndingWorker } from './workers/auction-ending.worker';
       BidCorrection,
       AuctionConsent,
       SettlementManifest,
+      Deposit,
+      DepositTransition,
+      PaymentLedger,
+      Refund,
     ]),
   ],
   controllers: [AuctionController, BidController],
-  providers: [AuctionService, BidService, RedisLockService, AuctionGateway, AuctionEndingWorker],
-  exports: [TypeOrmModule, AuctionService, BidService],
+  providers: [
+    AuctionService,
+    BidService,
+    RedisLockService,
+    AuctionGateway,
+    AuctionEndingWorker,
+    SettlementService,
+    SettlementWorker,
+    { provide: PAYMENT_SERVICE, useClass: MockPaymentService },
+  ],
+  exports: [TypeOrmModule, AuctionService, BidService, SettlementService],
 })
 export class AuctionsModule {}
