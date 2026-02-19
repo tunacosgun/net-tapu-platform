@@ -1,0 +1,271 @@
+# ============================================================================
+# NetTapu Platform — Integration Tests
+#
+# Runs Phase 12 load, chaos, and validation scripts against a live
+# auction-service backed by PostgreSQL + Redis service containers.
+#
+# Jobs:
+#   1. build          — compile shared + auction-service, upload artifacts
+#   2. type-check     — strict tsc --noEmit for all apps
+#   3. integration-test (matrix) — 7 parallel test jobs:
+#        Settlement Load | POS Chaos | Redis Chaos | DB Deadlock
+#        Memory Guard    | Metrics Validation | Ledger Integrity
+#
+# Every test job starts its own isolated Postgres + Redis, runs
+# migrations, boots the auction-service, and executes the script.
+# Pipeline fails if any script exits non-zero.
+# ============================================================================
+
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: integration-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────
+  # Build: compile shared + auction-service, upload dist artifacts
+  # ──────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=packages/shared
+
+      - name: Build auction-service
+        run: npm run build --workspace=apps/auction-service
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: |
+            packages/shared/dist
+            apps/auction-service/dist
+          retention-days: 1
+
+  # ──────────────────────────────────────────────────────────────────
+  # Type-check: strict tsc --noEmit for all apps
+  # ──────────────────────────────────────────────────────────────────
+  type-check:
+    name: Type Check
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+
+      - name: Type-check monolith
+        run: npx tsc --noEmit --project apps/monolith/tsconfig.build.json
+
+      - name: Type-check auction-service
+        run: npx tsc --noEmit --project apps/auction-service/tsconfig.build.json
+
+  # ──────────────────────────────────────────────────────────────────
+  # Integration tests: matrix of Phase 12 scripts
+  #
+  # Each matrix entry runs as an independent job with its own
+  # Postgres + Redis service containers. The auction-service is
+  # built from artifacts and started on the host.
+  # ──────────────────────────────────────────────────────────────────
+  integration-test:
+    name: ${{ matrix.name }}
+    needs: [build]
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ matrix.timeout }}
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nettapu_migrator
+          POSTGRES_PASSWORD: migrator_ci_password
+          POSTGRES_DB: nettapu
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nettapu_migrator -d nettapu"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Settlement Load Test
+            script: test-settlement-load.ts
+            auction_count: "5"
+            participants: "5"
+            timeout: 10
+
+          - name: POS Chaos Test
+            script: test-pos-chaos.ts
+            pos_fail_mode: "true"
+            auction_count: "3"
+            participants: "5"
+            timeout_ms: "180000"
+            timeout: 15
+
+          - name: Redis Chaos Test
+            script: test-redis-chaos.ts
+            auction_count: "5"
+            participants: "3"
+            timeout: 10
+
+          - name: DB Deadlock Test
+            script: test-db-deadlock.ts
+            timeout: 10
+
+          - name: Memory Guard Test
+            script: test-memory-guard.ts
+            participant_count: "550"
+            timeout: 10
+
+          - name: Metrics Validation
+            script: test-metrics-validation.ts
+            timeout: 5
+
+          - name: Ledger Integrity
+            script: validate-ledger-integrity.ts
+            timeout: 5
+
+    env:
+      DATABASE_URL: postgres://nettapu_app:app_secret_change_me@localhost:5432/nettapu
+      API_URL: http://localhost:3001
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+
+      - name: Initialize database
+        env:
+          PGPASSWORD: migrator_ci_password
+        run: |
+          psql -h localhost -U nettapu_migrator -d nettapu \
+            -v ON_ERROR_STOP=1 \
+            -f database/init/00_create_app_role.sql
+
+          sudo ln -s "$GITHUB_WORKSPACE/database/migrations" /migrations
+
+          psql -h localhost -U nettapu_migrator -d nettapu \
+            -v ON_ERROR_STOP=1 \
+            -f database/migrations/run_all.sql
+
+      - name: Start auction service
+        run: |
+          DATABASE_URL=postgresql://nettapu_app:app_secret_change_me@localhost:5432/nettapu \
+          REDIS_URL=redis://localhost:6379 \
+          JWT_SECRET=ci_integration_test_secret_32chars!! \
+          CORS_ORIGIN=http://localhost:3000 \
+          SNIPER_EXTENSION_SECONDS=60 \
+          POS_FAIL_MODE=${{ matrix.pos_fail_mode || 'false' }} \
+          PORT=3001 \
+          node apps/auction-service/dist/main.js &
+
+          echo "Waiting for auction service to become healthy..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001/api/v1/auctions/health > /dev/null 2>&1; then
+              echo "Auction service healthy (attempt $i)"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::error::Auction service did not become healthy within 60 seconds"
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Run ${{ matrix.name }}
+        env:
+          AUCTION_COUNT: ${{ matrix.auction_count || '' }}
+          PARTICIPANTS: ${{ matrix.participants || '' }}
+          TIMEOUT_MS: ${{ matrix.timeout_ms || '' }}
+          PARTICIPANT_COUNT: ${{ matrix.participant_count || '' }}
+        run: npx tsx scripts/${{ matrix.script }}
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "::group::Auction Service Process"
+          ps aux | grep 'node.*main.js' || true
+          echo "::endgroup::"
+
+          echo "::group::PostgreSQL Connections"
+          PGPASSWORD=migrator_ci_password psql -h localhost -U nettapu_migrator -d nettapu \
+            -c "SELECT pid, state, query FROM pg_stat_activity WHERE datname = 'nettapu' ORDER BY state;" || true
+          echo "::endgroup::"
+
+          echo "::group::Auction Status Summary"
+          PGPASSWORD=migrator_ci_password psql -h localhost -U nettapu_migrator -d nettapu \
+            -c "SELECT status, COUNT(*) FROM auctions.auctions GROUP BY status ORDER BY status;" || true
+          echo "::endgroup::"
+
+          echo "::group::Settlement Manifest Summary"
+          PGPASSWORD=migrator_ci_password psql -h localhost -U nettapu_migrator -d nettapu \
+            -c "SELECT status, COUNT(*) FROM auctions.settlement_manifests GROUP BY status ORDER BY status;" || true
+          echo "::endgroup::"
