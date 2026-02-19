@@ -12,3 +12,7 @@ $$;
 
 -- App role gets CONNECT only. Schema/table grants are handled per-migration.
 GRANT CONNECT ON DATABASE nettapu TO nettapu_app;
+
+-- Enable uuid-ossp extension (requires superuser, runs as POSTGRES_USER here).
+-- Must exist before TypeORM connects, otherwise app user gets permission denied.
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
