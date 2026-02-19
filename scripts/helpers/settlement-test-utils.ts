@@ -219,6 +219,17 @@ export async function waitForSettlements(
 
 /**
  * Clean up test data created by load tests.
+ *
+ * payments.payment_ledger and payments.deposit_transitions are append-only
+ * (protected by prevent_modification trigger in migration 012). They cannot
+ * be deleted. payments.deposits cannot be deleted either because those
+ * append-only tables reference them via FK.
+ *
+ * This is safe because:
+ *   - CI uses ephemeral databases (destroyed after each job)
+ *   - deposits.auction_id has no FK constraint (no cross-schema FK),
+ *     so auctions can be deleted independently
+ *   - Orphaned payment records don't affect future test runs
  */
 export async function cleanupTestAuctions(
   db: Client,
@@ -228,11 +239,15 @@ export async function cleanupTestAuctions(
 
   const placeholders = auctionIds.map((_, i) => `$${i + 1}`).join(', ');
 
-  // Delete in dependency order
+  // payments.refunds: deletable (not append-only), FK to deposits is safe
+  // since we are NOT deleting the parent deposits row
   await db.query(`DELETE FROM payments.refunds WHERE deposit_id IN (SELECT id FROM payments.deposits WHERE auction_id IN (${placeholders}))`, auctionIds);
-  await db.query(`DELETE FROM payments.payment_ledger WHERE deposit_id IN (SELECT id FROM payments.deposits WHERE auction_id IN (${placeholders}))`, auctionIds);
-  await db.query(`DELETE FROM payments.deposit_transitions WHERE deposit_id IN (SELECT id FROM payments.deposits WHERE auction_id IN (${placeholders}))`, auctionIds);
-  await db.query(`DELETE FROM payments.deposits WHERE auction_id IN (${placeholders})`, auctionIds);
+
+  // Skip: payments.payment_ledger    (append-only — trigger blocks DELETE)
+  // Skip: payments.deposit_transitions (append-only — trigger blocks DELETE)
+  // Skip: payments.deposits           (FK from append-only tables prevents DELETE)
+
+  // Auction-side tables: all deletable
   await db.query(`DELETE FROM auctions.auction_participants WHERE auction_id IN (${placeholders})`, auctionIds);
   await db.query(`DELETE FROM auctions.settlement_manifests WHERE auction_id IN (${placeholders})`, auctionIds);
   await db.query(`DELETE FROM auctions.bids WHERE auction_id IN (${placeholders})`, auctionIds);
