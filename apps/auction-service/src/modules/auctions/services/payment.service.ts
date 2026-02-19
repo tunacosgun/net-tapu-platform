@@ -188,16 +188,26 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+// ── Chaos Mode Constants ─────────────────────────────────────
+
+const CHAOS_FAIL_RATE = 0.5;       // 50% failure rate in chaos mode
+const CHAOS_TIMEOUT_RATE = 0.1;    // 10% simulated timeout in chaos mode
+const CHAOS_TIMEOUT_MS = 6_000;    // Exceeds POS_TIMEOUT_MS to trigger timeout
+
 // ── Mock Implementation ───────────────────────────────────────
 
 @Injectable()
 export class MockPaymentService implements IPaymentService {
   private readonly logger = new Logger(MockPaymentService.name);
   private readonly circuitBreaker: CircuitBreaker;
+  private readonly chaosEnabled: boolean;
+  private callCount = 0;
 
   constructor(
     @Optional() @Inject(MetricsService) private readonly metrics?: MetricsService,
   ) {
+    this.chaosEnabled = process.env.POS_FAIL_MODE === 'true';
+
     this.circuitBreaker = new CircuitBreaker({
       onStateChange: (state) => {
         this.metrics?.settlementPosCircuitState.set(CIRCUIT_STATE_VALUES[state]);
@@ -206,6 +216,16 @@ export class MockPaymentService implements IPaymentService {
         this.metrics?.settlementPosCircuitTripsTotal.inc();
       },
     });
+
+    if (this.chaosEnabled) {
+      this.logger.warn(
+        JSON.stringify({
+          event: 'pos_chaos_mode_enabled',
+          fail_rate: CHAOS_FAIL_RATE,
+          timeout_rate: CHAOS_TIMEOUT_RATE,
+        }),
+      );
+    }
   }
 
   getCircuitState(): CircuitState {
@@ -265,8 +285,15 @@ export class MockPaymentService implements IPaymentService {
       }),
     );
 
-    // Simulate POS latency (50-200ms)
-    await this.simulateLatency();
+    await this.simulateLatencyWithChaos();
+
+    if (this.chaosEnabled && this.shouldFail()) {
+      return {
+        success: false,
+        posReference: null,
+        message: 'Mock POS chaos: capture rejected',
+      };
+    }
 
     return {
       success: true,
@@ -286,8 +313,15 @@ export class MockPaymentService implements IPaymentService {
       }),
     );
 
-    // Simulate POS latency (50-200ms)
-    await this.simulateLatency();
+    await this.simulateLatencyWithChaos();
+
+    if (this.chaosEnabled && this.shouldFail()) {
+      return {
+        success: false,
+        posRefundId: null,
+        message: 'Mock POS chaos: refund rejected',
+      };
+    }
 
     return {
       success: true,
@@ -296,8 +330,21 @@ export class MockPaymentService implements IPaymentService {
     };
   }
 
-  private simulateLatency(): Promise<void> {
+  private shouldFail(): boolean {
+    return Math.random() < CHAOS_FAIL_RATE;
+  }
+
+  private async simulateLatencyWithChaos(): Promise<void> {
+    this.callCount++;
+
+    if (this.chaosEnabled && Math.random() < CHAOS_TIMEOUT_RATE) {
+      // Simulate a slow POS response that exceeds the timeout
+      await new Promise((resolve) => setTimeout(resolve, CHAOS_TIMEOUT_MS));
+      return;
+    }
+
+    // Normal latency: 50-200ms
     const ms = 50 + Math.random() * 150;
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    await new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
