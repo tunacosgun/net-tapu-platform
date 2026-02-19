@@ -34,6 +34,9 @@ export class Bid {
   @Column({ name: 'processor_dequeued_at', type: 'timestamptz', nullable: true })
   processorDequeuedAt!: Date | null;
 
+  @Column({ name: 'ip_address', type: 'inet', nullable: true })
+  ipAddress!: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 }
