@@ -96,7 +96,7 @@ async function main(): Promise<void> {
     `SELECT dt.deposit_id, COUNT(*) as cnt
      FROM payments.deposit_transitions dt
      JOIN payments.deposits d ON d.id = dt.deposit_id
-     WHERE d.auction_id = ANY($1) AND dt.event = 'DEPOSIT_CAPTURED'
+     WHERE d.auction_id = ANY($1) AND dt.event = 'deposit_captured'
      GROUP BY dt.deposit_id HAVING COUNT(*) > 1`,
     [auctionIds],
   );
@@ -106,7 +106,7 @@ async function main(): Promise<void> {
     `SELECT dt.deposit_id, COUNT(*) as cnt
      FROM payments.deposit_transitions dt
      JOIN payments.deposits d ON d.id = dt.deposit_id
-     WHERE d.auction_id = ANY($1) AND dt.event = 'DEPOSIT_REFUNDED'
+     WHERE d.auction_id = ANY($1) AND dt.event = 'deposit_refunded'
      GROUP BY dt.deposit_id HAVING COUNT(*) > 1`,
     [auctionIds],
   );

@@ -67,7 +67,7 @@ async function main(): Promise<void> {
   for (const dep of capturedDeposits.rows) {
     const ledgerResult = await db.query(
       `SELECT COUNT(*) as cnt FROM payments.payment_ledger
-       WHERE deposit_id = $1 AND event = 'DEPOSIT_CAPTURED'`,
+       WHERE deposit_id = $1 AND event = 'deposit_captured'`,
       [dep.id],
     );
     const count = parseInt(ledgerResult.rows[0].cnt);
@@ -84,7 +84,7 @@ async function main(): Promise<void> {
     const mismatch = await db.query(
       `SELECT d.id
        FROM payments.deposits d
-       LEFT JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'DEPOSIT_CAPTURED'
+       LEFT JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'deposit_captured'
        WHERE d.status = 'captured' ${auctionFilter}
        GROUP BY d.id
        HAVING COUNT(pl.id) != 1`,
@@ -107,7 +107,7 @@ async function main(): Promise<void> {
     const missingInitiated = await db.query(
       `SELECT d.id
        FROM payments.deposits d
-       LEFT JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'DEPOSIT_REFUND_INITIATED'
+       LEFT JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'deposit_refund_initiated'
        WHERE d.status = 'refunded' ${auctionFilter}
        GROUP BY d.id
        HAVING COUNT(pl.id) = 0`,
@@ -117,7 +117,7 @@ async function main(): Promise<void> {
     const missingRefunded = await db.query(
       `SELECT d.id
        FROM payments.deposits d
-       LEFT JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'DEPOSIT_REFUNDED'
+       LEFT JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'deposit_refunded'
        WHERE d.status = 'refunded' ${auctionFilter}
        GROUP BY d.id
        HAVING COUNT(pl.id) = 0`,
@@ -127,7 +127,7 @@ async function main(): Promise<void> {
     const dupRefundLedger = await db.query(
       `SELECT d.id, COUNT(pl.id) as cnt
        FROM payments.deposits d
-       JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'DEPOSIT_REFUNDED'
+       JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'deposit_refunded'
        WHERE d.status = 'refunded' ${auctionFilter}
        GROUP BY d.id
        HAVING COUNT(pl.id) > 1`,

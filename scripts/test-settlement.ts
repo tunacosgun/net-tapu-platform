@@ -301,7 +301,7 @@ async function verifyDbState(db: Client, auctionId: string): Promise<boolean> {
     if (auction.status === 'settled') {
       check(
         'Winner has DEPOSIT_CAPTURED transition',
-        winnerTransitions.some((t: any) => t.event === 'DEPOSIT_CAPTURED'),
+        winnerTransitions.some((t: any) => t.event === 'deposit_captured'),
         `transitions=${winnerTransitions.length}`,
       );
     }
@@ -315,8 +315,8 @@ async function verifyDbState(db: Client, auctionId: string): Promise<boolean> {
       if (auction.status === 'settled') {
         check(
           `Loser ${ld.id.slice(0, 8)}… has refund initiation + completion`,
-          lt.some((t: any) => t.event === 'DEPOSIT_REFUND_INITIATED') &&
-          lt.some((t: any) => t.event === 'DEPOSIT_REFUNDED'),
+          lt.some((t: any) => t.event === 'deposit_refund_initiated') &&
+          lt.some((t: any) => t.event === 'deposit_refunded'),
           `transitions=${lt.map((t: any) => t.event).join(', ')}`,
         );
       }

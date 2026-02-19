@@ -348,26 +348,26 @@ export class AdminFinanceController {
     });
 
     // ── Check 8: Ledger entry count consistency ─────────────────
-    // Each captured deposit should have a DEPOSIT_CAPTURED ledger entry
-    // Each refunded deposit should have DEPOSIT_REFUND_INITIATED + DEPOSIT_REFUNDED
+    // Each captured deposit should have a deposit_captured ledger entry
+    // Each refunded deposit should have deposit_refund_initiated + deposit_refunded
     const capturedLedgerCount = ledgerEntries.filter(
-      (l) => l.event === 'DEPOSIT_CAPTURED',
+      (l) => l.event === 'deposit_captured',
     ).length;
     const capturedDepositCount = deposits.filter((d) => d.status === 'captured').length;
     checks.push({
       name: 'captured_ledger_entries',
       pass: capturedLedgerCount === capturedDepositCount,
-      detail: `DEPOSIT_CAPTURED entries=${capturedLedgerCount}, captured deposits=${capturedDepositCount}`,
+      detail: `deposit_captured entries=${capturedLedgerCount}, captured deposits=${capturedDepositCount}`,
     });
 
     const refundedLedgerCount = ledgerEntries.filter(
-      (l) => l.event === 'DEPOSIT_REFUNDED',
+      (l) => l.event === 'deposit_refunded',
     ).length;
     const refundedDepositCount = deposits.filter((d) => d.status === 'refunded').length;
     checks.push({
       name: 'refunded_ledger_entries',
       pass: refundedLedgerCount === refundedDepositCount,
-      detail: `DEPOSIT_REFUNDED entries=${refundedLedgerCount}, refunded deposits=${refundedDepositCount}`,
+      detail: `deposit_refunded entries=${refundedLedgerCount}, refunded deposits=${refundedDepositCount}`,
     });
 
     // ── Check 9: Manifest items vs deposit states ───────────────

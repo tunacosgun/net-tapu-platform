@@ -380,7 +380,7 @@ export class SettlementService {
         depositId: deposit.id,
         fromStatus: 'held',
         toStatus: 'captured',
-        event: 'DEPOSIT_CAPTURED',
+        event: 'deposit_captured',
         reason: 'Settlement capture',
         metadata: {
           auctionId: item.idempotency_key.split(':')[1],
@@ -392,7 +392,7 @@ export class SettlementService {
       // Append payment ledger (financial record)
       await qr.manager.save(PaymentLedger, qr.manager.create(PaymentLedger, {
         depositId: deposit.id,
-        event: 'DEPOSIT_CAPTURED',
+        event: 'deposit_captured',
         amount: deposit.amount,
         currency: deposit.currency,
         metadata: {
@@ -512,7 +512,7 @@ export class SettlementService {
         depositId: deposit.id,
         fromStatus: 'held',
         toStatus: 'refund_pending',
-        event: 'DEPOSIT_REFUND_INITIATED',
+        event: 'deposit_refund_initiated',
         reason: 'Settlement refund',
         metadata: {
           auctionId: item.idempotency_key.split(':')[1],
@@ -523,7 +523,7 @@ export class SettlementService {
       // Append payment ledger
       await qr.manager.save(PaymentLedger, qr.manager.create(PaymentLedger, {
         depositId: deposit.id,
-        event: 'DEPOSIT_REFUND_INITIATED',
+        event: 'deposit_refund_initiated',
         amount: deposit.amount,
         currency: deposit.currency,
         metadata: {
@@ -674,7 +674,7 @@ export class SettlementService {
         depositId: deposit.id,
         fromStatus: 'refund_pending',
         toStatus: 'refunded',
-        event: 'DEPOSIT_REFUNDED',
+        event: 'deposit_refunded',
         reason: 'Settlement refund completed',
         metadata: {
           auctionId: item.idempotency_key.split(':')[1],
@@ -686,7 +686,7 @@ export class SettlementService {
       // Append payment ledger
       await qr.manager.save(PaymentLedger, qr.manager.create(PaymentLedger, {
         depositId: deposit.id,
-        event: 'DEPOSIT_REFUNDED',
+        event: 'deposit_refunded',
         amount: deposit.amount,
         currency: deposit.currency,
         metadata: {

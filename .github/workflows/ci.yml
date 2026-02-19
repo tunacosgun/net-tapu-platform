@@ -1,0 +1,288 @@
+# ============================================================================
+# NetTapu Platform — CI Pipeline
+#
+# Triggers on every push/PR to main. Three jobs run with fail-fast semantics:
+#   1. build        — npm install, build shared, type-check all apps, lint
+#   2. migrations   — validate SQL against disposable Postgres 16
+#   3. docker-integration — build images, compose up, health-check endpoints
+#
+# Jobs 1+2 run in parallel. Job 3 waits for both (fail-fast via `needs`).
+# Concurrent runs on the same ref are cancelled automatically.
+# ============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  # ──────────────────────────────────────────────────────────────────
+  # Job 1: Install, build shared, type-check all apps, lint
+  # ──────────────────────────────────────────────────────────────────
+  build:
+    name: Build & Type-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=packages/shared
+
+      - name: Type-check monolith
+        run: npx tsc --noEmit --project apps/monolith/tsconfig.build.json
+
+      - name: Type-check auction-service
+        run: npx tsc --noEmit --project apps/auction-service/tsconfig.build.json
+
+      - name: Lint (graceful skip if unconfigured)
+        run: |
+          if ls .eslintrc.* eslint.config.* 2>/dev/null | head -1 >/dev/null 2>&1; then
+            echo "ESLint config detected — running lint"
+            npx eslint . --ext .ts,.js
+          else
+            echo "::notice::No ESLint configuration found — skipping lint step"
+          fi
+
+  # ──────────────────────────────────────────────────────────────────
+  # Job 2: Validate all SQL migrations against a disposable Postgres
+  # Uses a service container — completely isolated, no prod data risk.
+  # ──────────────────────────────────────────────────────────────────
+  migrations:
+    name: Validate Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: nettapu_migrator
+          POSTGRES_PASSWORD: migrator_ci_password
+          POSTGRES_DB: nettapu
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U nettapu_migrator -d nettapu"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run database init scripts
+        env:
+          PGPASSWORD: migrator_ci_password
+        run: |
+          psql -h localhost -U nettapu_migrator -d nettapu \
+            -v ON_ERROR_STOP=1 \
+            -f database/init/00_create_app_role.sql
+
+      - name: Run all migrations
+        env:
+          PGPASSWORD: migrator_ci_password
+        run: |
+          # run_all.sql uses \i /migrations/... absolute paths (matching Docker mount).
+          # Create a symlink so psql can resolve them in CI.
+          sudo ln -s "$GITHUB_WORKSPACE/database/migrations" /migrations
+
+          psql -h localhost -U nettapu_migrator -d nettapu \
+            -v ON_ERROR_STOP=1 \
+            -f database/migrations/run_all.sql
+
+      - name: Verify schema integrity
+        env:
+          PGPASSWORD: migrator_ci_password
+        run: |
+          echo "=== Custom Schemas ==="
+          psql -h localhost -U nettapu_migrator -d nettapu -c \
+            "SELECT schema_name FROM information_schema.schemata
+             WHERE schema_name NOT IN ('pg_catalog','information_schema','pg_toast','public')
+             ORDER BY 1;"
+
+          echo ""
+          echo "=== Tables by Schema ==="
+          psql -h localhost -U nettapu_migrator -d nettapu -c \
+            "SELECT schemaname, tablename FROM pg_tables
+             WHERE schemaname NOT IN ('pg_catalog','information_schema')
+             ORDER BY 1, 2;"
+
+          echo ""
+          echo "=== Custom Enum Types ==="
+          psql -h localhost -U nettapu_migrator -d nettapu -c \
+            "SELECT n.nspname AS schema, t.typname AS enum,
+                    string_agg(e.enumlabel, ', ' ORDER BY e.enumsortorder) AS values
+             FROM pg_type t
+             JOIN pg_enum e ON t.oid = e.enumtypid
+             JOIN pg_namespace n ON t.typnamespace = n.oid
+             WHERE n.nspname NOT IN ('pg_catalog','information_schema')
+             GROUP BY n.nspname, t.typname
+             ORDER BY 1, 2;"
+
+  # ──────────────────────────────────────────────────────────────────
+  # Job 3: Build Docker images, start full stack, validate health
+  #
+  # Depends on jobs 1+2 — acts as fail-fast gate. If either upstream
+  # job fails, this job is skipped (no wasted compute on broken code).
+  # Uses docker compose with production-realistic env vars.
+  # ──────────────────────────────────────────────────────────────────
+  docker-integration:
+    name: Docker Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build, migrations]
+
+    env:
+      # Match defaults hardcoded in database/init/00_create_app_role.sql
+      POSTGRES_MIGRATOR_PASSWORD: migrator_secret_change_me
+      POSTGRES_APP_PASSWORD: app_secret_change_me
+      REDIS_PASSWORD: redis_secret_change_me
+      # Non-default JWT secret to pass production startup safety checks
+      JWT_SECRET: ci_pipeline_jwt_secret_not_for_production!!
+      # Non-wildcard CORS to pass production startup safety checks
+      CORS_ORIGIN: http://localhost:3000
+      SNIPER_EXTENSION_SECONDS: "60"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker images
+        run: docker compose build --parallel
+
+      - name: Start infrastructure (postgres + redis)
+        run: docker compose up -d postgres redis
+
+      - name: Wait for infrastructure health
+        run: |
+          echo "── Waiting for PostgreSQL ──"
+          for i in $(seq 1 30); do
+            if docker compose exec -T postgres pg_isready -U nettapu_migrator -d nettapu >/dev/null 2>&1; then
+              echo "PostgreSQL ready (attempt $i)"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "::error::PostgreSQL did not become ready within 60 seconds"
+              docker compose logs postgres
+              exit 1
+            fi
+            sleep 2
+          done
+
+          echo "── Waiting for Redis ──"
+          for i in $(seq 1 15); do
+            if docker compose exec -T redis redis-cli -a "$REDIS_PASSWORD" ping 2>/dev/null | grep -q PONG; then
+              echo "Redis ready (attempt $i)"
+              break
+            fi
+            if [ "$i" -eq 15 ]; then
+              echo "::error::Redis did not become ready within 30 seconds"
+              docker compose logs redis
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Run database migrations
+        run: |
+          docker compose exec -T postgres psql \
+            -U nettapu_migrator -d nettapu \
+            -v ON_ERROR_STOP=1 \
+            -f /migrations/run_all.sql
+
+      - name: Start application services
+        run: docker compose up -d monolith auction-service
+
+      - name: Wait for health endpoints
+        run: |
+          check_health() {
+            local name="$1" url="$2"
+            local max_attempts=30
+
+            echo "── Waiting for $name ($url) ──"
+            for i in $(seq 1 $max_attempts); do
+              code=$(curl -sf -o /dev/null -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+              if [ "$code" = "200" ]; then
+                echo "$name is healthy (attempt $i)"
+                return 0
+              fi
+              echo "  attempt $i/$max_attempts: HTTP $code"
+              if [ "$i" -eq "$max_attempts" ]; then
+                return 1
+              fi
+              sleep 5
+            done
+          }
+
+          check_health "Monolith" "http://localhost:3000/api/v1/health" || {
+            echo "::error::Monolith did not pass health check within 150 seconds"
+            docker compose logs monolith
+            exit 1
+          }
+
+          check_health "Auction Service" "http://localhost:3001/api/v1/auctions/health" || {
+            echo "::error::Auction service did not pass health check within 150 seconds"
+            docker compose logs auction-service
+            exit 1
+          }
+
+          echo ""
+          echo "All services healthy."
+
+      - name: Print health responses
+        run: |
+          echo "=== Monolith Health ==="
+          curl -sf http://localhost:3000/api/v1/health | jq .
+          echo ""
+          echo "=== Auction Service Health ==="
+          curl -sf http://localhost:3001/api/v1/auctions/health | jq .
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          echo "::group::Docker Compose Status"
+          docker compose ps -a
+          echo "::endgroup::"
+
+          echo "::group::PostgreSQL Logs"
+          docker compose logs --tail=50 postgres
+          echo "::endgroup::"
+
+          echo "::group::Redis Logs"
+          docker compose logs --tail=50 redis
+          echo "::endgroup::"
+
+          echo "::group::Monolith Logs"
+          docker compose logs --tail=100 monolith
+          echo "::endgroup::"
+
+          echo "::group::Auction Service Logs"
+          docker compose logs --tail=100 auction-service
+          echo "::endgroup::"
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v --remove-orphans

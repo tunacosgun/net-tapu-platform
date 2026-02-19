@@ -88,7 +88,7 @@ async function main(): Promise<void> {
     `SELECT d.id, COUNT(*) as cnt
      FROM payments.deposit_transitions dt
      JOIN payments.deposits d ON d.id = dt.deposit_id
-     WHERE d.auction_id = ANY($1) AND dt.event = 'DEPOSIT_CAPTURED'
+     WHERE d.auction_id = ANY($1) AND dt.event = 'deposit_captured'
      GROUP BY d.id HAVING COUNT(*) > 1`,
     [auctionIds],
   );
@@ -98,7 +98,7 @@ async function main(): Promise<void> {
     `SELECT d.id, COUNT(*) as cnt
      FROM payments.deposit_transitions dt
      JOIN payments.deposits d ON d.id = dt.deposit_id
-     WHERE d.auction_id = ANY($1) AND dt.event = 'DEPOSIT_REFUNDED'
+     WHERE d.auction_id = ANY($1) AND dt.event = 'deposit_refunded'
      GROUP BY d.id HAVING COUNT(*) > 1`,
     [auctionIds],
   );
@@ -153,8 +153,8 @@ async function main(): Promise<void> {
     info(`Ledger ${row.event}`, row.cnt);
   }
 
-  const capturedLedger = parseInt(ledgerCounts.rows.find((r: { event: string }) => r.event === 'DEPOSIT_CAPTURED')?.cnt ?? '0');
-  const refundedLedger = parseInt(ledgerCounts.rows.find((r: { event: string }) => r.event === 'DEPOSIT_REFUNDED')?.cnt ?? '0');
+  const capturedLedger = parseInt(ledgerCounts.rows.find((r: { event: string }) => r.event === 'deposit_captured')?.cnt ?? '0');
+  const refundedLedger = parseInt(ledgerCounts.rows.find((r: { event: string }) => r.event === 'deposit_refunded')?.cnt ?? '0');
 
   check('Ledger DEPOSIT_CAPTURED matches', capturedLedger === expectedCaptures, `${capturedLedger}/${expectedCaptures}`);
   check('Ledger DEPOSIT_REFUNDED matches', refundedLedger === expectedRefunds, `${refundedLedger}/${expectedRefunds}`);
