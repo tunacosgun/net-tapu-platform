@@ -16,6 +16,7 @@ import {
   CircuitOpenError,
 } from './payment.service';
 import { executeWithRetry } from '../utils/db-retry.util';
+import { MetricsService } from '../../../metrics/metrics.service';
 
 // ── Manifest JSONB types ──────────────────────────────────────
 
@@ -72,6 +73,7 @@ export class SettlementService {
     private readonly dataSource: DataSource,
     @Inject(PAYMENT_SERVICE)
     private readonly paymentService: IPaymentService,
+    private readonly metrics: MetricsService,
   ) {}
 
   // ── 1. Initiate Settlement ────────────────────────────────────
@@ -221,11 +223,15 @@ export class SettlementService {
     manifest: SettlementManifest,
     item: SettlementManifestItem,
   ): Promise<SettlementManifestItem> {
-    if (item.action === 'capture') {
-      return this.processCaptureItem(manifest, item);
-    } else {
-      return this.processRefundItem(manifest, item);
+    const result = item.action === 'capture'
+      ? await this.processCaptureItem(manifest, item)
+      : await this.processRefundItem(manifest, item);
+
+    if (result.status === 'failed') {
+      this.metrics.settlementItemFailuresTotal.inc({ action: result.action });
     }
+
+    return result;
   }
 
   private async processCaptureItem(

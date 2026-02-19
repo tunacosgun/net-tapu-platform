@@ -291,8 +291,6 @@ export class SettlementWorker implements OnModuleInit, OnModuleDestroy {
               } else {
                 this.metrics.settlementRefundsTotal.inc();
               }
-            } else if (items[i].status === 'failed') {
-              this.metrics.settlementItemFailuresTotal.inc({ action: items[i].action });
             }
 
             // Persist after each item for crash safety —
