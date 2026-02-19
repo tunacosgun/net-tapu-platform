@@ -75,6 +75,7 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret_change_me}@redis:6379
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production_min_32_chars!!}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      SNIPER_EXTENSION_SECONDS: ${SNIPER_EXTENSION_SECONDS:-60}
       PORT: 3001
     ports:
       - "3001:3001"

@@ -2,6 +2,9 @@
 -- Run as: nettapu_migrator
 -- Usage: psql -U nettapu_migrator -d nettapu -f /migrations/run_all.sql
 
+\echo '=== Migration 015: Enable uuid-ossp extension ==='
+\i /migrations/015_enable_uuid_extension.sql
+
 \echo '=== Migration 001: Create schemas ==='
 \i /migrations/001_create_schemas.sql
 
@@ -43,5 +46,20 @@
 
 \echo '=== Migration 014: Revoke DDL from app role ==='
 \i /migrations/014_revoke_ddl_from_app.sql
+
+\echo '=== Migration 016: Auction version column + bid IP ==='
+\i /migrations/016_auction_version_and_bid_ip.sql
+
+\echo '=== Migration 017: Add draft auction status ==='
+\i /migrations/017_add_draft_auction_status.sql
+
+\echo '=== Migration 018: Update auction transitions for draft ==='
+\i /migrations/018_update_auction_transitions_for_draft.sql
+
+\echo '=== Migration 019: Add ending auction status ==='
+\i /migrations/019_add_ending_auction_status.sql
+
+\echo '=== Migration 020: Sniper protection and ending transitions ==='
+\i /migrations/020_sniper_protection_and_ending_transitions.sql
 
 \echo '=== All migrations completed successfully ==='

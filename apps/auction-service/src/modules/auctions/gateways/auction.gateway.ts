@@ -24,6 +24,9 @@ import {
   AuctionStateMessage,
   BidAcceptedMessage,
   BidRejectedMessage,
+  AuctionExtendedMessage,
+  AuctionEndingMessage,
+  AuctionEndedMessage,
   WsContextInterceptor,
 } from '@nettapu/shared';
 import { MetricsService } from '../../../metrics/metrics.service';
@@ -182,6 +185,7 @@ export class AuctionGateway
     const room = `auction:${data.auctionId}`;
     await client.join(room);
 
+    const effectiveEnd = auction.extendedUntil ?? auction.scheduledEnd;
     const snapshot: AuctionStateMessage = {
       type: 'AUCTION_STATE',
       auction_id: auction.id,
@@ -190,12 +194,13 @@ export class AuctionGateway
       bid_count: auction.bidCount,
       participant_count: auction.participantCount,
       watcher_count: auction.watcherCount,
-      time_remaining_ms: auction.scheduledEnd
+      time_remaining_ms: effectiveEnd
         ? Math.max(
             0,
-            new Date(auction.scheduledEnd).getTime() - Date.now(),
+            new Date(effectiveEnd).getTime() - Date.now(),
           )
         : null,
+      extended_until: auction.extendedUntil?.toISOString() ?? null,
     };
 
     client.emit('auction_state', snapshot);
@@ -363,6 +368,16 @@ export class AuctionGateway
         server_timestamp: result.server_timestamp,
         new_bid_count: result.new_bid_count,
       });
+
+      // Broadcast sniper extension if triggered
+      if (result.sniper_extended && result.extended_until) {
+        this.broadcastAuctionExtended(data.auctionId, {
+          type: 'AUCTION_EXTENDED',
+          auction_id: data.auctionId,
+          new_end_time: result.extended_until,
+          triggered_by_bid_id: result.bid_id,
+        });
+      }
     } catch (err: unknown) {
       let reasonCode = 'unknown';
       let currentPrice = '';
@@ -390,9 +405,21 @@ export class AuctionGateway
     }
   }
 
-  // ── Public broadcast methods (used by REST BidController too) ──
+  // ── Public broadcast methods ───────────────────────────────────
 
   broadcastBidAccepted(auctionId: string, data: BidAcceptedMessage): void {
     this.server.to(`auction:${auctionId}`).emit('bid_accepted', data);
+  }
+
+  broadcastAuctionExtended(auctionId: string, data: AuctionExtendedMessage): void {
+    this.server.to(`auction:${auctionId}`).emit('auction_extended', data);
+  }
+
+  broadcastAuctionEnding(auctionId: string, data: AuctionEndingMessage): void {
+    this.server.to(`auction:${auctionId}`).emit('auction_ending', data);
+  }
+
+  broadcastAuctionEnded(auctionId: string, data: AuctionEndedMessage): void {
+    this.server.to(`auction:${auctionId}`).emit('auction_ended', data);
   }
 }

@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, VersionColumn } from 'typeorm';
 
 @Entity({ schema: 'auctions', name: 'auctions' })
 export class Auction {
@@ -14,7 +14,7 @@ export class Auction {
   @Column({ type: 'text', nullable: true })
   description!: string | null;
 
-  @Column({ type: 'enum', enum: ['scheduled', 'deposit_open', 'live', 'ended', 'settling', 'settled', 'settlement_failed', 'cancelled'], default: 'scheduled' })
+  @Column({ type: 'enum', enum: ['draft', 'scheduled', 'deposit_open', 'live', 'ending', 'ended', 'settling', 'settled', 'settlement_failed', 'cancelled'], default: 'draft' })
   status!: string;
 
   @Column({ name: 'starting_price', type: 'numeric', precision: 15, scale: 2 })
@@ -58,6 +58,9 @@ export class Auction {
   @Column({ name: 'ended_at', type: 'timestamptz', nullable: true })
   endedAt!: Date | null;
 
+  @Column({ name: 'extended_until', type: 'timestamptz', nullable: true })
+  extendedUntil!: Date | null;
+
   @Column({ type: 'integer', name: 'bid_count', default: 0 })
   bidCount!: number;
 
@@ -78,4 +81,7 @@ export class Auction {
 
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
+
+  @VersionColumn()
+  version!: number;
 }

@@ -1,7 +1,9 @@
 export enum AuctionStatus {
+  DRAFT = 'draft',
   SCHEDULED = 'scheduled',
   DEPOSIT_OPEN = 'deposit_open',
   LIVE = 'live',
+  ENDING = 'ending',
   ENDED = 'ended',
   SETTLING = 'settling',
   SETTLED = 'settled',

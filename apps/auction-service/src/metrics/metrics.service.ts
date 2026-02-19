@@ -17,6 +17,9 @@ export class MetricsService {
   readonly redisHealthStatus: Gauge;
   readonly auctionRateLimitHitsTotal: Counter;
   readonly userRateLimitHitsTotal: Counter;
+  readonly auctionExtensionsTotal: Counter;
+  readonly auctionEndingsTotal: Counter;
+  readonly auctionStateTransitionsTotal: Counter;
 
   constructor() {
     this.registry = new Registry();
@@ -64,6 +67,25 @@ export class MetricsService {
     this.userRateLimitHitsTotal = new Counter({
       name: 'user_rate_limit_hits_total',
       help: 'Total user-level rate limit hits',
+      registers: [this.registry],
+    });
+
+    this.auctionExtensionsTotal = new Counter({
+      name: 'auction_extensions_total',
+      help: 'Total sniper protection extensions',
+      registers: [this.registry],
+    });
+
+    this.auctionEndingsTotal = new Counter({
+      name: 'auction_endings_total',
+      help: 'Total auction endings (ENDING -> ENDED transitions)',
+      registers: [this.registry],
+    });
+
+    this.auctionStateTransitionsTotal = new Counter({
+      name: 'auction_state_transitions_total',
+      help: 'Total auction state transitions by from/to status',
+      labelNames: ['from', 'to'] as const,
       registers: [this.registry],
     });
   }

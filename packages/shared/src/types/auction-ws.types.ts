@@ -16,6 +16,7 @@ export interface AuctionStateMessage {
   participant_count: number;
   watcher_count: number;
   time_remaining_ms: number | null;
+  extended_until: string | null;  // ISO 8601 or null
 }
 
 export interface BidAcceptedMessage {
@@ -34,6 +35,13 @@ export interface BidRejectedMessage {
   message: string;
 }
 
+export interface AuctionExtendedMessage {
+  type: 'AUCTION_EXTENDED';
+  auction_id: string;
+  new_end_time: string;       // ISO 8601 timestamptz
+  triggered_by_bid_id: string;
+}
+
 export interface AuctionEndingMessage {
   type: 'AUCTION_ENDING';
   time_remaining_ms: number;
@@ -49,6 +57,7 @@ export type ServerMessage =
   | AuctionStateMessage
   | BidAcceptedMessage
   | BidRejectedMessage
+  | AuctionExtendedMessage
   | AuctionEndingMessage
   | AuctionEndedMessage;
 

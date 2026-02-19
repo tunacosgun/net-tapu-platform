@@ -16,7 +16,8 @@ import { ListAuctionsQueryDto } from '../dto/list-auctions-query.dto';
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   [AuctionStatus.DRAFT]: [AuctionStatus.SCHEDULED],
   [AuctionStatus.SCHEDULED]: [AuctionStatus.LIVE],
-  [AuctionStatus.LIVE]: [AuctionStatus.ENDED, AuctionStatus.CANCELLED],
+  [AuctionStatus.LIVE]: [AuctionStatus.ENDING, AuctionStatus.CANCELLED],
+  [AuctionStatus.ENDING]: [AuctionStatus.ENDED, AuctionStatus.CANCELLED],
 };
 
 @Injectable()

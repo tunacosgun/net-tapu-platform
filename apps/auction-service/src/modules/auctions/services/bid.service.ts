@@ -3,9 +3,12 @@ import {
   Logger,
   HttpException,
   HttpStatus,
+  Inject,
+  Optional,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, QueryRunner } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Decimal } from 'decimal.js';
 import { Auction } from '../entities/auction.entity';
 import { Bid } from '../entities/bid.entity';
@@ -18,6 +21,7 @@ import {
   AuctionStatus,
   BidRejectionReason,
 } from '@nettapu/shared';
+import { MetricsService } from '../../../metrics/metrics.service';
 
 const BID_LOCK_PREFIX = 'bid:lock:auction:';
 const BID_LOCK_TTL_MS = 5000;
@@ -30,6 +34,8 @@ export interface BidAcceptedResponse {
   new_bid_count: number;
   server_timestamp: string;
   idempotency_key: string;
+  sniper_extended: boolean;
+  extended_until: string | null;
 }
 
 @Injectable()
@@ -49,6 +55,8 @@ export class BidService {
     private readonly consentRepo: Repository<AuctionConsent>,
     private readonly dataSource: DataSource,
     private readonly redisLock: RedisLockService,
+    private readonly config: ConfigService,
+    @Optional() @Inject(MetricsService) private readonly metrics?: MetricsService,
   ) {}
 
   async placeBid(
@@ -221,9 +229,34 @@ export class BidService {
       });
       const savedBid = await qr.manager.save(Bid, newBid);
 
-      // ── PHASE 12: UPDATE auction (optimistic lock) ───────────
+      // ── PHASE 12: UPDATE auction (optimistic lock) + sniper ──
       auction!.currentPrice = dto.amount;
       auction!.bidCount = auction!.bidCount + 1;
+
+      // Sniper protection: extend if bid is within the sniper window
+      let sniperExtended = false;
+      let newExtendedUntil: Date | null = null;
+      const sniperWindowSeconds = this.config.get<number>(
+        'SNIPER_EXTENSION_SECONDS',
+      ) ?? 60;
+      const effectiveEnd = auction!.extendedUntil ?? auction!.scheduledEnd;
+
+      if (effectiveEnd && auction!.status === AuctionStatus.LIVE) {
+        const endTime = new Date(effectiveEnd).getTime();
+        const now = Date.now();
+        const remainingMs = endTime - now;
+
+        if (remainingMs > 0 && remainingMs <= sniperWindowSeconds * 1000) {
+          newExtendedUntil = new Date(now + sniperWindowSeconds * 1000);
+          auction!.extendedUntil = newExtendedUntil;
+          sniperExtended = true;
+          this.metrics?.auctionExtensionsTotal.inc();
+          this.logger.log(
+            `SNIPER EXTENSION auction=${dto.auctionId} newEnd=${newExtendedUntil.toISOString()} remainingWas=${remainingMs}ms`,
+          );
+        }
+      }
+
       // @VersionColumn auto-increments + checks WHERE version = :current
       try {
         await qr.manager.save(Auction, auction!);
@@ -248,7 +281,7 @@ export class BidService {
       await qr.commitTransaction();
 
       this.logger.log(
-        `BID ACCEPTED auction=${dto.auctionId} user=${userId} amount=${dto.amount} bid=${savedBid.id} ip=${ipAddress ?? 'unknown'}`,
+        `BID ACCEPTED auction=${dto.auctionId} user=${userId} amount=${dto.amount} bid=${savedBid.id} ip=${ipAddress ?? 'unknown'}${sniperExtended ? ` EXTENDED→${newExtendedUntil!.toISOString()}` : ''}`,
       );
 
       return {
@@ -259,6 +292,8 @@ export class BidService {
         new_bid_count: auction!.bidCount,
         server_timestamp: savedBid.serverTs.toISOString(),
         idempotency_key: savedBid.idempotencyKey,
+        sniper_extended: sniperExtended,
+        extended_until: newExtendedUntil?.toISOString() ?? null,
       };
     } catch (err) {
       if (qr?.isTransactionActive) {
@@ -326,6 +361,8 @@ export class BidService {
       new_bid_count: -1,
       server_timestamp: bid.serverTs.toISOString(),
       idempotency_key: bid.idempotencyKey,
+      sniper_extended: false,
+      extended_until: null,
     };
   }
 }
