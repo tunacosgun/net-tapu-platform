@@ -2,7 +2,6 @@ import {
   Injectable,
   CanActivate,
   ExecutionContext,
-  ForbiddenException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -14,14 +13,17 @@ interface JwtPayload {
   roles: string[];
 }
 
+/**
+ * Verifies JWT token and attaches the decoded payload to req.user.
+ * Does NOT enforce any specific role — use AdminGuard for admin-only endpoints.
+ */
 @Injectable()
-export class AdminGuard implements CanActivate {
+export class JwtAuthGuard implements CanActivate {
   constructor(private readonly config: ConfigService) {}
 
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest();
 
-    // Extract JWT from Authorization header
     const authHeader: string | undefined = req.headers?.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
       throw new UnauthorizedException('Missing or invalid Authorization header');
@@ -37,15 +39,7 @@ export class AdminGuard implements CanActivate {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
-    // Attach verified user to request for downstream use
     req.user = payload;
-
-    // Check admin role from verified token payload
-    const roles = payload.roles ?? [];
-    if (!roles.includes('admin') && !roles.includes('superadmin')) {
-      throw new ForbiddenException('Admin access required');
-    }
-
     return true;
   }
 }

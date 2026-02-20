@@ -5,12 +5,16 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  UseGuards,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { BidService, BidAcceptedResponse } from '../services/bid.service';
 import { PlaceBidDto } from '../dto/place-bid.dto';
 import { AuctionGateway } from '../gateways/auction.gateway';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @Controller('bids')
+@UseGuards(JwtAuthGuard)
 export class BidController {
   constructor(
     private readonly bidService: BidService,
@@ -23,11 +27,10 @@ export class BidController {
     @Body() dto: PlaceBidDto,
     @Req() req: Record<string, any>,
   ): Promise<BidAcceptedResponse> {
-    const userId =
-      req.user?.sub ?? (req.headers?.['x-user-id'] as string);
+    const userId = req.user?.sub;
 
     if (!userId) {
-      throw new Error('User ID is required');
+      throw new UnauthorizedException('Authenticated user ID is required');
     }
 
     const ipAddress =

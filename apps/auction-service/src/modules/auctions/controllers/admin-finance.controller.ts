@@ -11,8 +11,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Auction } from '../entities/auction.entity';
-import { Deposit } from '../entities/deposit.entity';
-import { PaymentLedger } from '../entities/payment-ledger.entity';
+import { Deposit, PaymentLedger } from '@nettapu/shared';
 import { SettlementManifest } from '../entities/settlement-manifest.entity';
 import { AdminGuard } from '../guards/admin.guard';
 import { ListLedgerQueryDto } from '../dto/list-ledger-query.dto';

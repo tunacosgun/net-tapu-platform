@@ -5,11 +5,7 @@ import { randomUUID } from 'crypto';
 import { Auction } from '../entities/auction.entity';
 import { AuctionParticipant } from '../entities/auction-participant.entity';
 import { SettlementManifest } from '../entities/settlement-manifest.entity';
-import { Deposit } from '../entities/deposit.entity';
-import { DepositTransition } from '../entities/deposit-transition.entity';
-import { PaymentLedger } from '../entities/payment-ledger.entity';
-import { Refund } from '../entities/refund.entity';
-import { AuctionStatus } from '@nettapu/shared';
+import { AuctionStatus, Deposit, DepositTransition, PaymentLedger, Refund } from '@nettapu/shared';
 import {
   PAYMENT_SERVICE,
   IPaymentService,

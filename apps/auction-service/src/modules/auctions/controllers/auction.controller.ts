@@ -30,11 +30,10 @@ export class AuctionController {
     @Body() dto: CreateAuctionDto,
     @Req() req: Record<string, any>,
   ) {
-    const userId =
-      req.user?.sub ?? (req.headers?.['x-user-id'] as string);
+    const userId = req.user?.sub;
 
     if (!userId) {
-      throw new UnauthorizedException('User ID is required');
+      throw new UnauthorizedException('Authenticated user ID is required');
     }
 
     return this.auctionService.create(dto, userId);

@@ -140,9 +140,7 @@ export class AdminSettlementController {
     @Req() req: Record<string, unknown>,
   ): Promise<RetryResponse> {
     const adminUserId =
-      (req as Record<string, Record<string, string>>).user?.sub ??
-      (req as Record<string, Record<string, string>>).headers?.['x-user-id'] ??
-      'unknown';
+      (req as Record<string, Record<string, string>>).user?.sub ?? 'unknown';
 
     const qr = this.dataSource.createQueryRunner();
     await qr.connect();
