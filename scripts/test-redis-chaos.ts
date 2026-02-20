@@ -116,11 +116,11 @@ async function main(): Promise<void> {
   console.log('\n--- Idempotency Key Uniqueness ---');
 
   const dupRefundKeys = await db.query(
-    `SELECT idempotency_key, COUNT(*) as cnt
+    `SELECT r.idempotency_key, COUNT(*) as cnt
      FROM payments.refunds r
      JOIN payments.deposits d ON d.id = r.deposit_id
      WHERE d.auction_id = ANY($1)
-     GROUP BY idempotency_key HAVING COUNT(*) > 1`,
+     GROUP BY r.idempotency_key HAVING COUNT(*) > 1`,
     [auctionIds],
   );
   check('No duplicate refund idempotency keys', dupRefundKeys.rows.length === 0);
