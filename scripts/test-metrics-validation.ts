@@ -13,6 +13,7 @@
  */
 
 const API_URL = process.env.API_URL || 'http://localhost:3001';
+const HARD_TIMEOUT_MS = 30_000;
 
 let totalChecks = 0;
 let passedChecks = 0;
@@ -31,7 +32,22 @@ function info(label: string, detail: string): void {
   console.log(`  INFO: ${label}: ${detail}`);
 }
 
+function logMemoryUsage(phase: string): void {
+  const mem = process.memoryUsage();
+  const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
+  console.log(`  MEM [${phase}]: RSS=${mb(mem.rss)}MB, heapUsed=${mb(mem.heapUsed)}MB, heapTotal=${mb(mem.heapTotal)}MB`);
+}
+
 async function main(): Promise<void> {
+  const timer = setTimeout(() => {
+    console.error(`\n  TIMEOUT: Metrics Validation exceeded hard limit of ${HARD_TIMEOUT_MS}ms — aborting`);
+    process.exit(2);
+  }, HARD_TIMEOUT_MS);
+  if (typeof timer === 'object' && typeof timer.unref === 'function') {
+    timer.unref();
+  }
+  logMemoryUsage('start');
+
   console.log('============================================');
   console.log('  Metrics Validation');
   console.log(`  API URL: ${API_URL}`);
@@ -90,6 +106,13 @@ async function main(): Promise<void> {
   const hasCount = text.includes('settlement_worker_duration_ms_count');
   check('Worker duration histogram has count', hasCount);
 
+  // ── Worker tick verification ─────────────────────────────
+  console.log('\n--- Worker Tick Verification ---');
+
+  const workerCountMatch = text.match(/^settlement_worker_duration_ms_count(?:\{[^}]*\})?\s+([\d.e+-]+)/m);
+  const workerTickCount = workerCountMatch ? parseFloat(workerCountMatch[1]) : 0;
+  check('Settlement worker has ticked at least once', workerTickCount > 0, `count=${workerTickCount}`);
+
   // ── Metric values ─────────────────────────────────────────
   console.log('\n--- Current Values ---');
 
@@ -127,6 +150,7 @@ async function main(): Promise<void> {
   }
 
   // ── Summary ───────────────────────────────────────────────
+  logMemoryUsage('end');
   console.log('\n============================================');
   console.log(`  RESULT: ${passedChecks}/${totalChecks} checks passed`);
   console.log(passedChecks === totalChecks ? '  ALL CHECKS PASSED' : '  SOME CHECKS FAILED');

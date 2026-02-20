@@ -25,6 +25,8 @@ import {
   check,
   info,
   getResults,
+  installHardTimeout,
+  logMemoryUsage,
 } from './helpers/settlement-test-utils';
 
 const DATABASE_URL = process.env.DATABASE_URL || DEFAULT_DB_URL;
@@ -32,6 +34,9 @@ const LOCK_HOLD_MS = parseInt(process.env.LOCK_HOLD_MS || '8000', 10);
 const TIMEOUT_MS = parseInt(process.env.TIMEOUT_MS || '60000', 10);
 
 async function main(): Promise<void> {
+  installHardTimeout(TIMEOUT_MS + 10_000, 'DB Deadlock Test');
+  logMemoryUsage('start');
+
   console.log('============================================');
   console.log('  DB Deadlock Simulation');
   console.log(`  Lock hold duration: ${LOCK_HOLD_MS}ms`);
@@ -205,6 +210,7 @@ async function main(): Promise<void> {
   }
 
   // ── Cleanup ───────────────────────────────────────────────
+  logMemoryUsage('end');
   console.log('\nCleaning up...');
   await cleanupTestAuctions(db, [auctionId]);
 

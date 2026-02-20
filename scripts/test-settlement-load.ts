@@ -28,6 +28,8 @@ import {
   check,
   info,
   getResults,
+  installHardTimeout,
+  logMemoryUsage,
 } from './helpers/settlement-test-utils';
 
 const DATABASE_URL = process.env.DATABASE_URL || DEFAULT_DB_URL;
@@ -36,6 +38,9 @@ const PARTICIPANTS = parseInt(process.env.PARTICIPANTS || '15', 10);
 const TIMEOUT_MS = parseInt(process.env.TIMEOUT_MS || '120000', 10);
 
 async function main(): Promise<void> {
+  installHardTimeout(TIMEOUT_MS + 10_000, 'Settlement Load Test');
+  logMemoryUsage('start');
+
   console.log('============================================');
   console.log('  High-Concurrency Settlement Load Test');
   console.log(`  Auctions: ${AUCTION_COUNT}`);
@@ -172,6 +177,7 @@ async function main(): Promise<void> {
   info('Total POS calls', `${totalItems}`);
 
   // ── Cleanup ───────────────────────────────────────────────
+  logMemoryUsage('end');
   console.log('\nCleaning up test data...');
   await cleanupTestAuctions(db, auctionIds);
 

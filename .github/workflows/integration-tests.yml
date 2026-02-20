@@ -140,7 +140,7 @@ jobs:
           --health-retries 5
 
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - name: Settlement Load Test
@@ -241,6 +241,13 @@ jobs:
             sleep 2
           done
 
+          echo "Verifying metrics endpoint..."
+          if ! curl -sf http://localhost:3001/metrics > /dev/null 2>&1; then
+            echo "::error::Metrics endpoint not available at /metrics"
+            exit 1
+          fi
+          echo "Metrics endpoint OK"
+
       - name: Run ${{ matrix.name }}
         env:
           AUCTION_COUNT: ${{ matrix.auction_count || '' }}
@@ -269,4 +276,12 @@ jobs:
           echo "::group::Settlement Manifest Summary"
           PGPASSWORD=migrator_ci_password psql -h localhost -U nettapu_migrator -d nettapu \
             -c "SELECT status, COUNT(*) FROM auctions.settlement_manifests GROUP BY status ORDER BY status;" || true
+          echo "::endgroup::"
+
+          echo "::group::Prometheus Metrics Dump"
+          curl -s http://localhost:3001/metrics || true
+          echo "::endgroup::"
+
+          echo "::group::Redis Connectivity"
+          redis-cli -h localhost ping || true
           echo "::endgroup::"

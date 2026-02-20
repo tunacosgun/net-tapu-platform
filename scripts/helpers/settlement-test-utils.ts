@@ -25,6 +25,32 @@ export interface TestSetup {
   testParcelId: string;
 }
 
+/**
+ * Sets a hard process timeout that kills the process with exit code 2
+ * if the test hangs past the expected duration. Prevents silent poll
+ * timeout followed by misleading zero-result validation.
+ */
+export function installHardTimeout(timeoutMs: number, label: string): void {
+  const timer = setTimeout(() => {
+    console.error(`\n  TIMEOUT: ${label} exceeded hard limit of ${timeoutMs}ms — aborting`);
+    // eslint-disable-next-line no-process-exit
+    process.exit(2);
+  }, timeoutMs);
+  // Allow the process to exit naturally if the test finishes before the timeout
+  if (typeof timer === 'object' && typeof timer.unref === 'function') {
+    timer.unref();
+  }
+}
+
+/**
+ * Logs process memory usage (RSS and heap) for leak detection.
+ */
+export function logMemoryUsage(phase: string): void {
+  const mem = process.memoryUsage();
+  const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
+  console.log(`  MEM [${phase}]: RSS=${mb(mem.rss)}MB, heapUsed=${mb(mem.heapUsed)}MB, heapTotal=${mb(mem.heapTotal)}MB`);
+}
+
 let totalChecks = 0;
 let passedChecks = 0;
 

@@ -27,6 +27,8 @@ import {
   check,
   info,
   getResults,
+  installHardTimeout,
+  logMemoryUsage,
 } from './helpers/settlement-test-utils';
 
 const DATABASE_URL = process.env.DATABASE_URL || DEFAULT_DB_URL;
@@ -35,6 +37,9 @@ const PARTICIPANT_COUNT = parseInt(process.env.PARTICIPANT_COUNT || '601', 10);
 const TIMEOUT_MS = parseInt(process.env.TIMEOUT_MS || '60000', 10);
 
 async function main(): Promise<void> {
+  installHardTimeout(TIMEOUT_MS + 10_000, 'Memory Guard Test');
+  logMemoryUsage('start');
+
   console.log('============================================');
   console.log('  Memory Safety Guard Test');
   console.log(`  Participants: ${PARTICIPANT_COUNT} (limit=500)`);
@@ -210,6 +215,7 @@ async function main(): Promise<void> {
   }
 
   // ── Cleanup ───────────────────────────────────────────────
+  logMemoryUsage('end');
   console.log('\nCleaning up...');
   await cleanupTestAuctions(db, [auctionId]);
 

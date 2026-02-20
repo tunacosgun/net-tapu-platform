@@ -30,6 +30,8 @@ import {
   check,
   info,
   getResults,
+  installHardTimeout,
+  logMemoryUsage,
 } from './helpers/settlement-test-utils';
 
 const DATABASE_URL = process.env.DATABASE_URL || DEFAULT_DB_URL;
@@ -46,6 +48,9 @@ async function fetchMetric(name: string): Promise<number | null> {
 }
 
 async function main(): Promise<void> {
+  installHardTimeout(TIMEOUT_MS + 10_000, 'POS Chaos Test');
+  logMemoryUsage('start');
+
   console.log('============================================');
   console.log('  POS Failure Storm Simulation');
   console.log(`  Auctions: ${AUCTION_COUNT} (${PARTICIPANTS} participants each)`);
@@ -179,6 +184,7 @@ async function main(): Promise<void> {
   check('Item failures occurred (chaos working)', newFailures > 0, `${newFailures}`);
 
   // ── Cleanup ───────────────────────────────────────────────
+  logMemoryUsage('end');
   console.log('\nCleaning up...');
   await cleanupTestAuctions(db, auctionIds);
 

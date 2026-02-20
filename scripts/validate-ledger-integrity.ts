@@ -20,6 +20,7 @@ const DATABASE_URL =
   process.env.DATABASE_URL ||
   'postgres://nettapu_app:nettapu_app_pass@localhost:5432/nettapu';
 const AUCTION_ID = process.env.AUCTION_ID;
+const HARD_TIMEOUT_MS = 30_000;
 
 let totalChecks = 0;
 let passedChecks = 0;
@@ -40,7 +41,22 @@ function info(label: string, detail: string): void {
   console.log(`  INFO: ${label}: ${detail}`);
 }
 
+function logMemoryUsage(phase: string): void {
+  const mem = process.memoryUsage();
+  const mb = (bytes: number) => (bytes / 1024 / 1024).toFixed(1);
+  console.log(`  MEM [${phase}]: RSS=${mb(mem.rss)}MB, heapUsed=${mb(mem.heapUsed)}MB, heapTotal=${mb(mem.heapTotal)}MB`);
+}
+
 async function main(): Promise<void> {
+  const timer = setTimeout(() => {
+    console.error(`\n  TIMEOUT: Ledger Integrity exceeded hard limit of ${HARD_TIMEOUT_MS}ms — aborting`);
+    process.exit(2);
+  }, HARD_TIMEOUT_MS);
+  if (typeof timer === 'object' && typeof timer.unref === 'function') {
+    timer.unref();
+  }
+  logMemoryUsage('start');
+
   console.log('============================================');
   console.log('  Ledger Integrity Validator');
   console.log(`  Scope: ${AUCTION_ID ? `Auction ${AUCTION_ID}` : 'All settled auctions'}`);
@@ -49,9 +65,11 @@ async function main(): Promise<void> {
   const db = new Client({ connectionString: DATABASE_URL });
   await db.connect();
 
-  const auctionFilter = AUCTION_ID
-    ? `AND d.auction_id = '${AUCTION_ID}'`
+  // Parameterized auction filter to avoid SQL injection
+  const auctionFilterSQL = AUCTION_ID
+    ? `AND d.auction_id = $1`
     : `AND d.auction_id IN (SELECT id FROM auctions.auctions WHERE status IN ('settled', 'settlement_failed'))`;
+  const auctionFilterParams: string[] = AUCTION_ID ? [AUCTION_ID] : [];
 
   // ── 1. Captured deposits → exactly 1 DEPOSIT_CAPTURED ledger ──
   console.log('--- Check 1: Captured Deposits vs Ledger ---');
@@ -59,7 +77,8 @@ async function main(): Promise<void> {
   const capturedDeposits = await db.query(
     `SELECT d.id, d.amount, d.auction_id
      FROM payments.deposits d
-     WHERE d.status = 'captured' ${auctionFilter}`,
+     WHERE d.status = 'captured' ${auctionFilterSQL}`,
+    auctionFilterParams,
   );
 
   info('Captured deposits', `${capturedDeposits.rows.length}`);
@@ -85,9 +104,10 @@ async function main(): Promise<void> {
       `SELECT d.id
        FROM payments.deposits d
        LEFT JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'deposit_captured'
-       WHERE d.status = 'captured' ${auctionFilter}
+       WHERE d.status = 'captured' ${auctionFilterSQL}
        GROUP BY d.id
        HAVING COUNT(pl.id) != 1`,
+      auctionFilterParams,
     );
     check('All captured deposits have exactly 1 DEPOSIT_CAPTURED entry', mismatch.rows.length === 0, `mismatches=${mismatch.rows.length}`);
   }
@@ -98,7 +118,8 @@ async function main(): Promise<void> {
   const refundedDeposits = await db.query(
     `SELECT d.id, d.amount, d.auction_id
      FROM payments.deposits d
-     WHERE d.status = 'refunded' ${auctionFilter}`,
+     WHERE d.status = 'refunded' ${auctionFilterSQL}`,
+    auctionFilterParams,
   );
 
   info('Refunded deposits', `${refundedDeposits.rows.length}`);
@@ -108,9 +129,10 @@ async function main(): Promise<void> {
       `SELECT d.id
        FROM payments.deposits d
        LEFT JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'deposit_refund_initiated'
-       WHERE d.status = 'refunded' ${auctionFilter}
+       WHERE d.status = 'refunded' ${auctionFilterSQL}
        GROUP BY d.id
        HAVING COUNT(pl.id) = 0`,
+      auctionFilterParams,
     );
     check('All refunded deposits have DEPOSIT_REFUND_INITIATED', missingInitiated.rows.length === 0, `missing=${missingInitiated.rows.length}`);
 
@@ -118,9 +140,10 @@ async function main(): Promise<void> {
       `SELECT d.id
        FROM payments.deposits d
        LEFT JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'deposit_refunded'
-       WHERE d.status = 'refunded' ${auctionFilter}
+       WHERE d.status = 'refunded' ${auctionFilterSQL}
        GROUP BY d.id
        HAVING COUNT(pl.id) = 0`,
+      auctionFilterParams,
     );
     check('All refunded deposits have DEPOSIT_REFUNDED', missingRefunded.rows.length === 0, `missing=${missingRefunded.rows.length}`);
 
@@ -128,9 +151,10 @@ async function main(): Promise<void> {
       `SELECT d.id, COUNT(pl.id) as cnt
        FROM payments.deposits d
        JOIN payments.payment_ledger pl ON pl.deposit_id = d.id AND pl.event = 'deposit_refunded'
-       WHERE d.status = 'refunded' ${auctionFilter}
+       WHERE d.status = 'refunded' ${auctionFilterSQL}
        GROUP BY d.id
        HAVING COUNT(pl.id) > 1`,
+      auctionFilterParams,
     );
     check('No duplicate DEPOSIT_REFUNDED entries', dupRefundLedger.rows.length === 0, `duplicates=${dupRefundLedger.rows.length}`);
   }
@@ -207,6 +231,7 @@ async function main(): Promise<void> {
   check('No orphan ledger entries', orphanLedger.rows.length === 0, `orphans=${orphanLedger.rows.length}`);
 
   // ── Summary ───────────────────────────────────────────────
+  logMemoryUsage('end');
   console.log('\n============================================');
   console.log(`  RESULT: ${passedChecks}/${totalChecks} checks passed`);
   if (violations > 0) {
