@@ -76,6 +76,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production_min_32_chars!!}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       SNIPER_EXTENSION_SECONDS: ${SNIPER_EXTENSION_SECONDS:-60}
+      POS_FAIL_MODE: ${POS_FAIL_MODE:-false}
       PORT: 3001
     ports:
       - "3001:3001"
