@@ -1,9 +1,10 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { JsonLoggerService } from '@nettapu/shared';
 import { AppModule } from './app.module';
 import { RedisIoAdapter } from './adapters/redis-io.adapter';
+
 
 async function bootstrap() {
   const jsonLogger = new JsonLoggerService('auction-service');
@@ -38,7 +39,9 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, { logger: jsonLogger });
 
-  app.setGlobalPrefix('api/v1/auctions');
+  app.setGlobalPrefix('api/v1/auctions', {
+    exclude: [{ path: 'metrics', method: RequestMethod.GET }],
+  });
   app.useGlobalPipes(new ValidationPipe({ transform: true }));
   app.enableCors({ origin: corsOrigin || '*' });
   app.enableShutdownHooks();
