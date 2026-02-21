@@ -72,6 +72,11 @@ export class AuctionGateway
 
   afterInit(server: Server) {
     const secret = this.config.getOrThrow<string>('JWT_SECRET');
+    const verifyOptions: jwt.VerifyOptions = {
+      algorithms: ['HS256'],
+      issuer: this.config.getOrThrow<string>('JWT_ISSUER'),
+      audience: this.config.getOrThrow<string>('JWT_AUDIENCE'),
+    };
 
     server.use((socket: Socket, next: (err?: Error) => void) => {
       const token =
@@ -89,7 +94,7 @@ export class AuctionGateway
       }
 
       try {
-        const payload = jwt.verify(token, secret) as JwtPayload;
+        const payload = jwt.verify(token, secret, verifyOptions) as JwtPayload;
         socket.data.userId = payload.sub;
         socket.data.email = payload.email;
         socket.data.roles = payload.roles;
@@ -103,7 +108,7 @@ export class AuctionGateway
       }
     });
 
-    this.logger.log('JWT authentication middleware registered');
+    this.logger.log('JWT authentication middleware registered (HS256-only, iss/aud enforced)');
   }
 
   handleConnection(client: Socket) {

@@ -45,6 +45,8 @@ services:
       DATABASE_URL: postgresql://nettapu_app:${POSTGRES_APP_PASSWORD:-app_secret_change_me}@postgres:5432/nettapu
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret_change_me}@redis:6379
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production_min_32_chars!!}
+      JWT_ISSUER: ${JWT_ISSUER:-nettapu}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-nettapu-platform}
       JWT_ACCESS_EXPIRATION: 15m
       JWT_REFRESH_EXPIRATION_DAYS: "7"
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
@@ -74,6 +76,8 @@ services:
       DATABASE_URL: postgresql://nettapu_app:${POSTGRES_APP_PASSWORD:-app_secret_change_me}@postgres:5432/nettapu
       REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secret_change_me}@redis:6379
       JWT_SECRET: ${JWT_SECRET:-change_me_in_production_min_32_chars!!}
+      JWT_ISSUER: ${JWT_ISSUER:-nettapu}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-nettapu-platform}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       SNIPER_EXTENSION_SECONDS: ${SNIPER_EXTENSION_SECONDS:-60}
       POS_FAIL_MODE: ${POS_FAIL_MODE:-false}

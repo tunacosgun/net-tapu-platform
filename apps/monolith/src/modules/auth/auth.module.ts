@@ -32,7 +32,12 @@ import { RolesGuard } from './guards/roles.guard';
         const expiresIn = config.get<string>('JWT_ACCESS_EXPIRATION', '15m');
         return {
           secret: config.getOrThrow<string>('JWT_SECRET'),
-          signOptions: { expiresIn } as JwtModuleOptions['signOptions'],
+          signOptions: {
+            expiresIn,
+            algorithm: 'HS256',
+            issuer: config.getOrThrow<string>('JWT_ISSUER'),
+            audience: config.getOrThrow<string>('JWT_AUDIENCE'),
+          } as JwtModuleOptions['signOptions'],
         };
       },
     }),

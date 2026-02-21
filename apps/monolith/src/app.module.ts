@@ -20,7 +20,7 @@ import { MetricsModule } from './metrics/metrics.module';
     ConfigModule.forRoot({
       isGlobal: true,
       validate: (config: Record<string, unknown>) => {
-        const required = ['DATABASE_URL', 'REDIS_URL', 'JWT_SECRET'];
+        const required = ['DATABASE_URL', 'REDIS_URL', 'JWT_SECRET', 'JWT_ISSUER', 'JWT_AUDIENCE'];
         for (const key of required) {
           if (!config[key]) {
             throw new Error(`Missing required environment variable: ${key}`);

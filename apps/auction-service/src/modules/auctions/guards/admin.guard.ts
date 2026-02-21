@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   ForbiddenException,
   UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as jwt from 'jsonwebtoken';
@@ -16,7 +17,16 @@ interface JwtPayload {
 
 @Injectable()
 export class AdminGuard implements CanActivate {
-  constructor(private readonly config: ConfigService) {}
+  private readonly logger = new Logger(AdminGuard.name);
+  private readonly verifyOptions: jwt.VerifyOptions;
+
+  constructor(private readonly config: ConfigService) {
+    this.verifyOptions = {
+      algorithms: ['HS256'],
+      issuer: this.config.getOrThrow<string>('JWT_ISSUER'),
+      audience: this.config.getOrThrow<string>('JWT_AUDIENCE'),
+    };
+  }
 
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest();
@@ -32,8 +42,9 @@ export class AdminGuard implements CanActivate {
 
     let payload: JwtPayload;
     try {
-      payload = jwt.verify(token, secret) as JwtPayload;
-    } catch {
+      payload = jwt.verify(token, secret, this.verifyOptions) as JwtPayload;
+    } catch (err) {
+      this.logger.warn(`JWT verification failed: ${(err as Error).message}`);
       throw new UnauthorizedException('Invalid or expired token');
     }
 
