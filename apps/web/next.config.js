@@ -4,6 +4,7 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ['@nettapu/shared'],
+  productionBrowserSourceMaps: true,
 
   async rewrites() {
     const apiTarget = process.env.API_URL || 'http://localhost:3000';
