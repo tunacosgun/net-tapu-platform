@@ -14,6 +14,7 @@ import { ParcelReservation } from './entities/parcel-reservation.entity';
 import { ParcelService } from './services/parcel.service';
 import { ParcelMediaService } from './services/parcel-media.service';
 import { ParcelImportService } from './services/parcel-import.service';
+import { ParcelPdfService } from './services/parcel-pdf.service';
 import { FavoriteService } from './services/favorite.service';
 import { SavedSearchService } from './services/saved-search.service';
 import { GeoSearchService } from './services/geo-search.service';
@@ -71,6 +72,7 @@ import { AdminModule } from '../admin/admin.module';
     ParcelService,
     ParcelMediaService,
     ParcelImportService,
+    ParcelPdfService,
     FavoriteService,
     SavedSearchService,
     GeoSearchService,

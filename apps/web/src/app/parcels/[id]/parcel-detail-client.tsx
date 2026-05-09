@@ -404,7 +404,18 @@ export default function ParcelDetailClient() {
     if (!parcel || pdfLoading) return;
     setPdfLoading(true);
     try {
-      await generatePDF(parcel, images, siteSettings as unknown as Record<string, string>);
+      // Backend-rendered PDF (logo + watermark + detail table + QR)
+      const res = await apiClient.get<Blob>(`/parcels/${parcel.id}/pdf`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(res.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `parsel-${parcel.listingId || parcel.id.slice(0, 8)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
     } catch (e) {
       console.error('PDF generation error:', e);
       alert('PDF oluşturulurken bir hata oluştu.');
