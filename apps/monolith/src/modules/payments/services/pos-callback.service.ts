@@ -349,6 +349,8 @@ export class PosCallbackService {
         return (body.merchant_oid as string) || null;
       case 'iyzico':
         return (body.paymentId as string) || null;
+      case 'moka':
+        return (body.OtherTrxCode as string) || null;
       default:
         return (body.paymentId as string) || null;
     }

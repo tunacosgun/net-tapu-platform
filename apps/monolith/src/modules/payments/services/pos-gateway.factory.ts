@@ -17,6 +17,8 @@ import {
   PaytrConfig,
   IyzicoGateway,
   IyzicoConfig,
+  MokaGateway,
+  MokaConfig,
 } from '@nettapu/shared';
 import { MockPosGateway } from './mock-pos-gateway.service';
 
@@ -173,9 +175,39 @@ export function posGatewayFactory(config: ConfigService): IPosGateway {
       break;
     }
 
+    case 'moka': {
+      const mokaConfig: MokaConfig = {
+        dealerCode: config.getOrThrow<string>('MOKA_DEALER_CODE'),
+        username: config.getOrThrow<string>('MOKA_USERNAME'),
+        password: config.getOrThrow<string>('MOKA_PASSWORD'),
+        shaIndex: config.getOrThrow<string>('MOKA_SHA_INDEX'),
+        baseUrl: config.get<string>('MOKA_BASE_URL', 'https://service.testmoka.com'),
+        callbackUrl: config.getOrThrow<string>('MOKA_CALLBACK_URL'),
+        testMode: config.get<string>('MOKA_TEST_MODE', '1') === '1',
+      };
+      const httpPostJson = async (url: string, body: unknown, headers: Record<string, string>) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(body),
+            signal: controller.signal,
+          });
+          return { data: await res.json() };
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+      gateway = new MokaGateway(mokaConfig, httpPostJson, logger);
+      logger.log('POS provider initialized: moka');
+      break;
+    }
+
     default:
       throw new Error(
-        `Unknown POS_PROVIDER: "${provider}". Supported: mock, paytr, iyzico`,
+        `Unknown POS_PROVIDER: "${provider}". Supported: mock, paytr, iyzico, moka`,
       );
   }
 

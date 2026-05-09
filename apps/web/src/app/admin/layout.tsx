@@ -32,9 +32,10 @@ const navSections: Array<{
     { href: '/admin/auctions',  label: 'Açık Artırmalar',  icon: Gavel },
   ]},
   { title: 'Finans', items: [
-    { href: '/admin/deposits',       label: 'Depozitolar',  icon: CreditCard },
-    { href: '/admin/bank-transfers', label: 'Havale / EFT', icon: Landmark },
-    { href: '/admin/reconciliation', label: 'Mutabakat',    icon: ClipboardList },
+    { href: '/admin/deposits',       label: 'Depozitolar',   icon: CreditCard },
+    { href: '/admin/bank-transfers', label: 'Havale / EFT',  icon: Landmark },
+    { href: '/admin/installments',   label: 'Taksitli Satış', icon: CreditCard },
+    { href: '/admin/reconciliation', label: 'Mutabakat',     icon: ClipboardList },
   ]},
   { title: 'CRM', items: [
     { href: '/admin/contacts',     label: 'İletişim Talepleri', icon: Phone },
