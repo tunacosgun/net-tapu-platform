@@ -53,53 +53,132 @@ export class AdminParcelController {
     return this.parcelService.findAll(query);
   }
 
-  /** Export parcels as CSV — MUST be before :id route */
+  /** Export parcels — `?format=csv` (default, BOM'lu) or `?format=xlsx` (native Excel) */
   @Get('export')
-  async exportCsv(@Res() res: Response) {
+  async exportParcels(
+    @Res() res: Response,
+    @Query('format') format?: string,
+  ) {
     const parcels = await this.parcelRepo.find({
       order: { createdAt: 'DESC' },
       take: 10000,
     });
 
-    const headers = [
+    const headerKeys = [
       'listing_id', 'title', 'status', 'city', 'district', 'neighborhood',
       'ada', 'parsel', 'area_m2', 'price', 'currency', 'price_per_m2',
       'zoning_status', 'land_type', 'latitude', 'longitude',
       'is_featured', 'is_auction_eligible', 'created_at',
-    ];
+    ] as const;
 
-    const csvRows = [headers.join(',')];
-    for (const p of parcels) {
-      const row = [
-        p.listingId,
-        `"${(p.title || '').replace(/"/g, '""')}"`,
-        p.status,
-        p.city,
-        p.district,
-        p.neighborhood || '',
-        p.ada || '',
-        p.parsel || '',
-        p.areaM2 || '',
-        p.price || '',
-        p.currency,
-        p.pricePerM2 || '',
-        `"${(p.zoningStatus || '').replace(/"/g, '""')}"`,
-        `"${(p.landType || '').replace(/"/g, '""')}"`,
-        p.latitude || '',
-        p.longitude || '',
-        p.isFeatured,
-        p.isAuctionEligible,
-        p.createdAt?.toISOString() || '',
-      ];
-      csvRows.push(row.join(','));
+    const headerLabels: Record<typeof headerKeys[number], string> = {
+      listing_id: 'İlan No',
+      title: 'Başlık',
+      status: 'Durum',
+      city: 'İl',
+      district: 'İlçe',
+      neighborhood: 'Mahalle',
+      ada: 'Ada',
+      parsel: 'Parsel',
+      area_m2: 'Alan (m²)',
+      price: 'Fiyat',
+      currency: 'Para Birimi',
+      price_per_m2: 'm² Fiyatı',
+      zoning_status: 'İmar Durumu',
+      land_type: 'Arazi Tipi',
+      latitude: 'Enlem',
+      longitude: 'Boylam',
+      is_featured: 'Öne Çıkan',
+      is_auction_eligible: 'İhaleye Uygun',
+      created_at: 'Oluşturma Tarihi',
+    };
+
+    const rowFor = (p: Parcel): Record<string, string | number | boolean> => ({
+      listing_id: p.listingId,
+      title: p.title || '',
+      status: p.status,
+      city: p.city,
+      district: p.district,
+      neighborhood: p.neighborhood || '',
+      ada: p.ada || '',
+      parsel: p.parsel || '',
+      area_m2: p.areaM2 ? Number(p.areaM2) : '',
+      price: p.price ? Number(p.price) : '',
+      currency: p.currency,
+      price_per_m2: p.pricePerM2 ? Number(p.pricePerM2) : '',
+      zoning_status: p.zoningStatus || '',
+      land_type: p.landType || '',
+      latitude: p.latitude || '',
+      longitude: p.longitude || '',
+      is_featured: p.isFeatured,
+      is_auction_eligible: p.isAuctionEligible,
+      created_at: p.createdAt?.toISOString() || '',
+    });
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    if (format === 'xlsx') {
+      const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'NetTapu Admin';
+      workbook.created = new Date();
+      const sheet = workbook.addWorksheet('Arsalar', {
+        views: [{ state: 'frozen', ySplit: 1 }],
+      });
+
+      sheet.columns = headerKeys.map((k) => ({
+        header: headerLabels[k],
+        key: k,
+        width: Math.max(12, headerLabels[k].length + 4),
+      }));
+
+      const headerRow = sheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE5E7EB' },
+      };
+
+      for (const p of parcels) {
+        sheet.addRow(rowFor(p));
+      }
+
+      sheet.getColumn('price').numFmt = '#,##0.00';
+      sheet.getColumn('price_per_m2').numFmt = '#,##0.00';
+      sheet.getColumn('area_m2').numFmt = '#,##0.00';
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      res.set({
+        'Content-Type':
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="parcels-export-${today}.xlsx"`,
+      });
+      res.end(Buffer.from(buffer));
+      return;
     }
 
+    // Default: CSV with BOM (Excel-friendly Turkish chars)
+    const csvRows = [headerKeys.map((k) => headerLabels[k]).join(',')];
+    for (const p of parcels) {
+      const row = rowFor(p);
+      const cells = headerKeys.map((k) => {
+        const v = row[k];
+        if (v === null || v === undefined || v === '') return '';
+        const s = typeof v === 'string' ? v : String(v);
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      });
+      csvRows.push(cells.join(','));
+    }
     const csv = csvRows.join('\n');
     res.set({
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="parcels-export-${new Date().toISOString().slice(0, 10)}.csv"`,
+      'Content-Disposition': `attachment; filename="parcels-export-${today}.csv"`,
     });
-    res.send('\uFEFF' + csv); // BOM for Turkish chars in Excel
+    res.send('﻿' + csv);
   }
 
   /** Bulk price adjustment (percentage-based) */
@@ -203,32 +282,44 @@ export class AdminParcelController {
     return this.parcelService.updateStatus(id, dto, user.sub);
   }
 
-  /** Import parcels from CSV */
+  /** Import parcels from CSV / XLSX / XLS */
   @Post('import')
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(
     FileInterceptor('file', {
-      limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
     }),
   )
-  async importCsv(
+  async importParcels(
     @UploadedFile() file: Express.Multer.File,
     @Query('dryRun') dryRunStr?: string,
     @CurrentUser() user?: JwtPayload,
   ) {
     if (!file) {
-      throw new BadRequestException('CSV file is required');
+      throw new BadRequestException('Parcel file is required (CSV / XLSX / XLS)');
     }
 
-    const ext = file.originalname.toLowerCase().endsWith('.csv');
-    const mime =
+    const lower = file.originalname.toLowerCase();
+    const isCsv = lower.endsWith('.csv');
+    const isXlsx = lower.endsWith('.xlsx') || lower.endsWith('.xls');
+    const mimeOk =
       file.mimetype === 'text/csv' ||
-      file.mimetype === 'application/vnd.ms-excel';
-    if (!ext && !mime) {
-      throw new BadRequestException('Only CSV files are accepted');
+      file.mimetype === 'application/vnd.ms-excel' ||
+      file.mimetype.includes('spreadsheetml') ||
+      file.mimetype === 'application/octet-stream'; // some browsers send this for xlsx
+    if (!isCsv && !isXlsx && !mimeOk) {
+      throw new BadRequestException(
+        'Only CSV, XLSX or XLS files are accepted',
+      );
     }
 
     const dryRun = dryRunStr === 'true';
-    return this.importService.importCsv(file.buffer, user!.sub, dryRun);
+    return this.importService.importFile(
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+      user!.sub,
+      dryRun,
+    );
   }
 }

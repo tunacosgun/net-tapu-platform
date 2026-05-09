@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { parse } from 'csv-parse';
+import * as ExcelJS from 'exceljs';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { Parcel } from '../entities/parcel.entity';
@@ -32,12 +33,45 @@ export class ParcelImportService {
     private readonly auditLogService: AuditLogService,
   ) {}
 
+  /**
+   * Public entry point — auto-detects file type by extension/MIME and parses
+   * accordingly. Falls back to CSV if format is unknown.
+   */
+  async importFile(
+    buffer: Buffer,
+    filename: string,
+    mimeType: string,
+    userId: string,
+    dryRun: boolean,
+  ): Promise<ImportResult> {
+    const lower = filename.toLowerCase();
+    const isXlsx =
+      lower.endsWith('.xlsx') ||
+      lower.endsWith('.xls') ||
+      mimeType.includes('spreadsheetml') ||
+      mimeType === 'application/vnd.ms-excel';
+
+    if (isXlsx) {
+      const records = await this.parseXlsx(buffer);
+      return this.importRecords(records, userId, dryRun);
+    }
+    return this.importCsv(buffer, userId, dryRun);
+  }
+
   async importCsv(
     buffer: Buffer,
     userId: string,
     dryRun: boolean,
   ): Promise<ImportResult> {
     const records = await this.parseCsv(buffer);
+    return this.importRecords(records, userId, dryRun);
+  }
+
+  private async importRecords(
+    records: Record<string, string>[],
+    userId: string,
+    dryRun: boolean,
+  ): Promise<ImportResult> {
 
     const result: ImportResult = {
       totalRows: records.length,
@@ -194,6 +228,69 @@ export class ParcelImportService {
     );
 
     return result;
+  }
+
+  /**
+   * Parse .xlsx / .xls buffer using ExcelJS.
+   * First row is treated as header (column names matching ImportParcelRowDto fields).
+   * Empty cells are dropped so optional validators behave correctly.
+   */
+  private async parseXlsx(buffer: Buffer): Promise<Record<string, string>[]> {
+    const workbook = new ExcelJS.Workbook();
+    try {
+      // ExcelJS expects ArrayBuffer-like input
+      await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
+    } catch (err) {
+      throw new BadRequestException(
+        `XLSX parse error: ${err instanceof Error ? err.message : 'unknown'}`,
+      );
+    }
+
+    const sheet = workbook.worksheets[0];
+    if (!sheet) throw new BadRequestException('XLSX has no sheets');
+
+    const records: Record<string, string>[] = [];
+    let headers: string[] = [];
+
+    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      const values = row.values as Array<unknown>;
+      // ExcelJS row.values is 1-indexed; index 0 is undefined
+      const cells = values.slice(1).map((v) => this.cellToString(v));
+
+      if (rowNumber === 1) {
+        headers = cells.map((c) => c.trim());
+        return;
+      }
+
+      const record: Record<string, string> = {};
+      for (let i = 0; i < headers.length; i++) {
+        const key = headers[i];
+        if (!key) continue;
+        const val = cells[i];
+        if (val === undefined || val === null || val === '') continue;
+        record[key] = val;
+      }
+      if (Object.keys(record).length > 0) records.push(record);
+    });
+
+    return records;
+  }
+
+  /** Coerce ExcelJS cell value (string|number|Date|formula|RichText) → string */
+  private cellToString(v: unknown): string {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'string') return v.trim();
+    if (typeof v === 'number') return String(v);
+    if (typeof v === 'boolean') return v ? 'true' : 'false';
+    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    // Formula cell: { formula, result }
+    if (typeof v === 'object' && v !== null) {
+      const obj = v as { result?: unknown; richText?: Array<{ text: string }>; text?: string };
+      if (obj.result !== undefined) return this.cellToString(obj.result);
+      if (Array.isArray(obj.richText)) return obj.richText.map((r) => r.text).join('');
+      if (typeof obj.text === 'string') return obj.text;
+    }
+    return String(v);
   }
 
   private parseCsv(buffer: Buffer): Promise<Record<string, string>[]> {
