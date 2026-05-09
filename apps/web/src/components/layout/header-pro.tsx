@@ -439,6 +439,18 @@ export function HeaderPro() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Close search on outside click
+  useEffect(() => {
+    if (!searchOpen) return;
+    function onMouseDown(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onMouseDown);
+    return () => document.removeEventListener('mousedown', onMouseDown);
+  }, [searchOpen]);
+
   const isAuthPage = pathname?.startsWith('/login') || pathname?.startsWith('/register') || pathname?.startsWith('/forgot-password');
   const isAdminPage = pathname?.startsWith('/admin');
   if (isAuthPage || isAdminPage) return null;
@@ -478,18 +490,6 @@ export function HeaderPro() {
     setSearchQuery('');
     router.push(`/parcels?search=${encodeURIComponent(trimmed)}`);
   }
-
-  // Close search on outside click
-  useEffect(() => {
-    if (!searchOpen) return;
-    function onMouseDown(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setSearchOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', onMouseDown);
-    return () => document.removeEventListener('mousedown', onMouseDown);
-  }, [searchOpen]);
 
   return (
     <>
