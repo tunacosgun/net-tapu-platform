@@ -4,8 +4,27 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/api-client';
 import { showApiError } from '@/components/api-error-toast';
-import { PageHeader, Button, Alert } from '@/components/ui';
+import { PageHeader, Button } from '@/components/ui';
 import { CreditCard, ShieldAlert, CheckCircle2 } from 'lucide-react';
+
+function Banner({
+  variant,
+  children,
+}: {
+  variant: 'warning' | 'success' | 'error';
+  children: React.ReactNode;
+}) {
+  const styles = {
+    warning: 'border-amber-200 bg-amber-50 text-amber-900',
+    success: 'border-emerald-200 bg-emerald-50 text-emerald-900',
+    error: 'border-red-200 bg-red-50 text-red-900',
+  } as const;
+  return (
+    <div className={`flex gap-3 rounded-lg border px-4 py-3 text-sm ${styles[variant]}`}>
+      <div className="flex-1">{children}</div>
+    </div>
+  );
+}
 
 interface MailOrderResult {
   id: string;
@@ -89,13 +108,13 @@ export default function AdminMailOrderPage() {
         <PageHeader title="Mail Order Sonucu" />
         <div className="mt-6 rounded-lg border bg-white p-6 space-y-4">
           {success ? (
-            <Alert variant="success" icon={<CheckCircle2 className="h-5 w-5" />}>
+            <Banner variant="success">
               Tahsilat başarılı (status: <strong>{result.status}</strong>).
-            </Alert>
+            </Banner>
           ) : (
-            <Alert variant="warning" icon>
+            <Banner variant="warning">
               İşlem tamamlandı, durum: <strong>{result.status}</strong>
-            </Alert>
+            </Banner>
           )}
 
           <dl className="grid grid-cols-2 gap-3 text-sm">
@@ -135,14 +154,14 @@ export default function AdminMailOrderPage() {
         subtitle="Telefon üzerinden alınan kart bilgisiyle MOTO modunda tahsilat (3DS bypass)"
       />
 
-      <Alert variant="warning" icon className="mt-4">
+      <Banner variant="warning">
         <strong>Dikkat:</strong> Mail Order işlemleri 3D Secure'dan geçmez. Sadece kart sahibinin
         telefonda kimliğini doğruladıktan sonra başlatın. Tüm işlemler operatör kimliğiyle ledger'a
         yazılır.
-      </Alert>
+      </Banner>
 
       <form onSubmit={submit} className="mt-6 space-y-4 rounded-lg border bg-white p-6">
-        {error && <Alert variant="error">{error}</Alert>}
+        {error && <Banner variant="error">{error}</Banner>}
 
         <h3 className="font-semibold text-sm uppercase text-[var(--muted-foreground)]">
           Müşteri & Tutar
