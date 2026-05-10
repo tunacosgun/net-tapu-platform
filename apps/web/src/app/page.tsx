@@ -200,6 +200,7 @@ export default function HomePage() {
               onSubmit={handleSearch}
               className="max-w-3xl mx-auto"
               data-testid="hero-search-form"
+              data-tour="home-search"
             >
               <div className="relative group">
                 {/* Glow effect */}
@@ -313,7 +314,7 @@ export default function HomePage() {
               </div>
 
               {/* Quick links */}
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <div data-tour="home-popular" className="mt-6 flex flex-wrap items-center justify-center gap-3">
                 <span className="text-sm text-slate-400 font-medium">Popüler:</span>
                 {['İstanbul', 'İzmir', 'Antalya', 'Muğla'].map((city) => (
                   <button
@@ -344,7 +345,7 @@ export default function HomePage() {
       {/* ═══════════════════════════════════════════════════════════════
           STATS SECTION - Elevated Cards
           ═══════════════════════════════════════════════════════════════ */}
-      <section className="relative -mt-16 mb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
+      <section data-tour="home-stats" className="relative -mt-16 mb-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-10">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           {[
             { value: `${stats.parcels}+`, label: 'Aktif İlan', icon: Building2, color: 'emerald', gradient: 'from-emerald-500 to-emerald-600' },

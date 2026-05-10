@@ -41,6 +41,18 @@ export function TourEngine() {
     if (driverRef.current) {
       driverRef.current.destroy();
     }
+    // Filter out steps whose target element doesn't exist on this render —
+    // keeps the tour clean when DOM changes between page versions.
+    const liveSteps = tour.steps.filter((s) => {
+      if (!s.element) return true; // intro/outro centered steps OK
+      try {
+        return !!document.querySelector(s.element);
+      } catch {
+        return false;
+      }
+    });
+    if (liveSteps.length === 0) return;
+
     const d = driver({
       showProgress: true,
       progressText: 'Adım {{current}} / {{total}}',
@@ -53,7 +65,7 @@ export function TourEngine() {
       stageRadius: 8,
       popoverClass: 'nettapu-tour-popover',
       overlayOpacity: 0.55,
-      steps: tour.steps.map((s) => ({
+      steps: liveSteps.map((s) => ({
         element: s.element,
         popover: {
           title: s.title,

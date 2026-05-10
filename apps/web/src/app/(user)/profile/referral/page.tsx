@@ -109,13 +109,13 @@ export default function MyReferralPage() {
         <p className="text-xs font-semibold uppercase text-emerald-700 mb-1">
           Davet Kodun
         </p>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3" data-tour="referral-code">
           <code className="text-3xl font-bold tracking-wider font-mono text-slate-900">
             {data.referralCode}
           </code>
         </div>
 
-        <div className="mt-5 flex gap-2 flex-wrap">
+        <div className="mt-5 flex gap-2 flex-wrap" data-tour="referral-share">
           <input
             readOnly
             value={inviteUrl}

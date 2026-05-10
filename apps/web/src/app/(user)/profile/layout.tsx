@@ -67,10 +67,18 @@ export default function ProfileLayout({
                   item.href === '/profile'
                     ? pathname === '/profile'
                     : pathname.startsWith(item.href);
+                const tourKey = item.href === '/profile/favorites'
+                  ? 'profile-favorites'
+                  : item.href === '/profile/installments'
+                  ? 'profile-installments'
+                  : item.href === '/profile/referral'
+                  ? 'profile-referral'
+                  : undefined;
                 return (
                   <Link
                     key={item.href}
                     href={item.href}
+                    data-tour={tourKey}
                     className={`flex items-center gap-2.5 whitespace-nowrap rounded-md px-3 py-2 text-sm cursor-pointer transition-colors duration-150 ${
                       isActive
                         ? 'bg-brand-50 text-brand-700 font-medium'

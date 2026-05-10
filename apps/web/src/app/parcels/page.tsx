@@ -265,7 +265,7 @@ function ParcelsContent() {
                 </button>
 
                 {/* View toggle */}
-                <div className="flex items-center bg-slate-100 rounded-lg p-1" data-testid="view-toggle">
+                <div className="flex items-center bg-slate-100 rounded-lg p-1" data-testid="view-toggle" data-tour="parcels-map-toggle">
                   <button
                     onClick={() => handleViewChange('grid')}
                     className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow-sm text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
@@ -361,6 +361,7 @@ function ParcelsContent() {
                   exit={{ opacity: 0, x: -20 }}
                   className="lg:w-80 shrink-0"
                   data-testid="filter-sidebar"
+                  data-tour="parcels-filter"
                 >
                   <div className="sticky top-24 bg-white rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.04)] p-6 space-y-6">
                     

@@ -598,7 +598,9 @@ export function HeaderPro() {
             })}
 
             {/* İhaleler live dropdown */}
-            <AuctionsLiveDropdown pathname={pathname} />
+            <div data-tour="header-auctions">
+              <AuctionsLiveDropdown pathname={pathname} />
+            </div>
 
             {/* Kurumsal dropdown trigger */}
             <div
@@ -860,7 +862,7 @@ export function HeaderPro() {
                 </div>
               </>
             ) : (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3" data-tour="header-login">
                 <Link
                   href="/login"
                   className="hidden lg:block px-4 py-2.5 text-sm font-semibold text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-all duration-200"
