@@ -47,6 +47,10 @@ export interface MokaDirectPayment3dRequest {
     ReturnHash: 1;            // request hash callback
     RedirectUrl: string;      // = MokaConfig.callbackUrl
     RedirectType: 0 | 1;      // 0 = no redirect, 1 = redirect after 3DS
+    IsPreAuth?: 0 | 1;
+    IsPoolPayment?: 0 | 1;
+    /** Mail order — bypasses 3DS on Moka */
+    IsMailOrderTransaction?: 0 | 1;
     BuyerInformation?: {
       BuyerFullName?: string;
       BuyerEmail?: string;

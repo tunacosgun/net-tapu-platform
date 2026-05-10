@@ -796,6 +796,131 @@ export class PaymentService {
     return { data, meta: { total, page, limit } };
   }
 
+  // ── Mail Order (admin-only) ────────────────────────────────
+
+  /**
+   * Admin-initiated MOTO transaction. Bypasses 3DS — requires the operator
+   * to have authenticated the cardholder over the phone.
+   *
+   * Card data is forwarded to the provider as a base64 JSON cardToken in
+   * the format adapters expect: {n,m,y,c,h}. Card data is NEVER stored
+   * in our DB — only the masked PAN ("123456******1234") + ledger entry.
+   */
+  async initiateMailOrder(
+    dto: import('../dto/initiate-mail-order.dto').InitiateMailOrderDto,
+    adminUserId: string,
+  ): Promise<Payment> {
+    // Encode card details as the opaque token adapters parse
+    const cardToken = Buffer.from(
+      JSON.stringify({
+        n: dto.cardNumber,
+        m: dto.expMonth,
+        y: dto.expYear,
+        c: dto.cvc,
+        h: dto.cardHolder,
+      }),
+    ).toString('base64');
+
+    const masked = `${dto.cardNumber.slice(0, 6)}******${dto.cardNumber.slice(-4)}`;
+    const description = dto.description ?? `MOTO • ${masked} • op:${adminUserId.slice(0, 8)}`;
+
+    // 1. Create Payment row in pending state
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    await qr.startTransaction();
+
+    let payment: Payment;
+    try {
+      payment = qr.manager.create(Payment, {
+        userId: dto.userId,
+        parcelId: dto.parcelId ?? null,
+        auctionId: dto.auctionId ?? null,
+        amount: dto.amount,
+        currency: dto.currency ?? 'TRY',
+        status: PaymentStatus.PENDING,
+        paymentMethod: 'mail_order',
+        description,
+        idempotencyKey: dto.idempotencyKey,
+      });
+      payment = await qr.manager.save(Payment, payment);
+
+      await qr.manager.save(
+        PaymentLedger,
+        qr.manager.create(PaymentLedger, {
+          paymentId: payment.id,
+          event: LedgerEvent.PAYMENT_INITIATED,
+          amount: payment.amount,
+          currency: payment.currency,
+          metadata: {
+            channel: 'mail_order',
+            masked_pan: masked,
+            card_holder: dto.cardHolder,
+            operator_id: adminUserId,
+            operator_notes: dto.operatorNotes,
+          },
+        }),
+      );
+
+      await qr.manager.save(
+        IdempotencyKey,
+        qr.manager.create(IdempotencyKey, {
+          key: dto.idempotencyKey,
+          operationType: 'mail_order_initiation',
+          requestHash: createHash('sha256')
+            .update(`${dto.userId}|${dto.amount}|${masked}`)
+            .digest('hex'),
+          responseBody: { paymentId: payment.id },
+          expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_HOURS * 3600_000),
+        }),
+      );
+
+      await qr.commitTransaction();
+    } catch (err) {
+      if (qr.isTransactionActive) await qr.rollbackTransaction();
+      throw err;
+    } finally {
+      await qr.release();
+    }
+
+    // 2. Call POS with isMoto flag
+    let initResult: ProvisionInitiationResponse;
+    try {
+      initResult = await this.posGateway.initiateProvision({
+        paymentId: payment.id,
+        amount: payment.amount,
+        currency: payment.currency,
+        idempotencyKey: dto.idempotencyKey,
+        cardToken,
+        isMoto: true,
+        buyer: dto.buyerEmail
+          ? {
+              email: dto.buyerEmail,
+              firstName: dto.cardHolder.split(' ').slice(0, -1).join(' ') || dto.cardHolder,
+              lastName: dto.cardHolder.split(' ').slice(-1).join(''),
+              ip: '0.0.0.0',
+              phone: dto.buyerPhone,
+            }
+          : undefined,
+      });
+    } catch (posErr) {
+      await this.recordPosResult(payment, {
+        success: false,
+        posReference: null,
+        message: (posErr as Error).message,
+      });
+      return (await this.paymentRepo.findOne({ where: { id: payment.id } })) ?? payment;
+    }
+
+    const success = initResult.status === 'completed';
+    await this.recordPosResult(payment, {
+      success,
+      posReference: initResult.posReference,
+      message: initResult.message,
+    });
+
+    return (await this.paymentRepo.findOne({ where: { id: payment.id } })) ?? payment;
+  }
+
   // ── Helpers ────────────────────────────────────────────────
 
   private hashRequest(dto: InitiatePaymentDto): string {

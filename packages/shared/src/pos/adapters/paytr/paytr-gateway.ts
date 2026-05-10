@@ -106,6 +106,11 @@ export class PaytrGateway extends BasePosGateway {
         params.append('card_token', req.cardToken);
       }
 
+      // Mail Order / Telephone Order — skip 3DS authentication
+      if (req.isMoto) {
+        params.append('non_3d', '1');
+      }
+
       const response = await this.httpPost(PAYTR_GET_TOKEN_URL, params);
       const data = response.data as PaytrGetTokenResponse;
 

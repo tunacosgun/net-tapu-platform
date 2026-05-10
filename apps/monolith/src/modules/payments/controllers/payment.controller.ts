@@ -18,6 +18,7 @@ import { Roles } from '../../auth/decorators/roles.decorator';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { PaymentService } from '../services/payment.service';
 import { InitiatePaymentDto } from '../dto/initiate-payment.dto';
+import { InitiateMailOrderDto } from '../dto/initiate-mail-order.dto';
 import { ListPaymentsQueryDto } from '../dto/list-payments-query.dto';
 
 @Controller('payments')
@@ -48,6 +49,18 @@ export class PaymentController {
   @Roles('admin')
   async adminList(@Query() query: ListPaymentsQueryDto & { paymentMethod?: string; sortBy?: string; sortOrder?: string }) {
     return this.paymentService.findAllAdmin(query);
+  }
+
+  /** Admin-only: initiate a Mail Order / Telephone Order transaction (no 3DS) */
+  @Post('admin/mail-order')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'superadmin')
+  @HttpCode(HttpStatus.CREATED)
+  async mailOrder(
+    @Body() dto: InitiateMailOrderDto,
+    @CurrentUser() user: { sub: string },
+  ) {
+    return this.paymentService.initiateMailOrder(dto, user.sub);
   }
 
   @Get(':id')

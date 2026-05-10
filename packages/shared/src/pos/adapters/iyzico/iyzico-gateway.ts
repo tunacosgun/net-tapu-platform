@@ -68,6 +68,8 @@ export class IyzicoGateway extends BasePosGateway {
         currency: this.mapCurrency(req.currency),
         basketId: req.paymentId,
         paymentGroup: 'PRODUCT',
+        // Mail order channel — bypasses 3DS authentication
+        ...(req.isMoto ? { paymentChannel: 'MOTO' } : {}),
         callbackUrl: this.config.callbackUrl,
         buyer: {
           id: req.paymentId,

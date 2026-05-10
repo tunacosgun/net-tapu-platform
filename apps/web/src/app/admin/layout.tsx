@@ -35,6 +35,7 @@ const navSections: Array<{
     { href: '/admin/deposits',       label: 'Depozitolar',   icon: CreditCard },
     { href: '/admin/bank-transfers', label: 'Havale / EFT',  icon: Landmark },
     { href: '/admin/installments',   label: 'Taksitli Satış', icon: CreditCard },
+    { href: '/admin/mail-order',     label: 'Mail Order',    icon: CreditCard },
     { href: '/admin/reconciliation', label: 'Mutabakat',     icon: ClipboardList },
   ]},
   { title: 'CRM', items: [

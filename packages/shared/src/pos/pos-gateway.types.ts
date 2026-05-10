@@ -7,6 +7,12 @@ export interface ProvisionRequest {
   currency: string;
   idempotencyKey: string;
   cardToken?: string;
+  /**
+   * Mail Order / Telephone Order flag — bypasses 3DS, uses MOTO channel
+   * on the provider side. Admin-initiated only; never set this for
+   * customer-facing flows.
+   */
+  isMoto?: boolean;
   /** Buyer details required by some providers (iyzico) */
   buyer?: {
     email: string;

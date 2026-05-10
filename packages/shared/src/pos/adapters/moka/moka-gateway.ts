@@ -111,7 +111,8 @@ export class MokaGateway extends BasePosGateway {
           Description: `NetTapu payment ${req.paymentId}`,
           ReturnHash: 1,
           RedirectUrl: this.config.callbackUrl,
-          RedirectType: 1,
+          RedirectType: req.isMoto ? 0 : 1,
+          IsMailOrderTransaction: req.isMoto ? 1 : 0,
           BuyerInformation: buyer
             ? {
                 BuyerFullName: `${buyer.firstName} ${buyer.lastName}`,
@@ -130,18 +131,33 @@ export class MokaGateway extends BasePosGateway {
       );
       const data = response.data as MokaDirectPayment3dResponse;
 
-      if (data.IsSuccessful && data.Data?.Url) {
-        this.logResponse('initiateProvision', requestId, true, {
-          payment_id: req.paymentId,
-          has_url: true,
-        });
-        return {
-          status: 'requires_3ds',
-          posReference: null,
-          message: 'Moka 3DS URL ready — redirect user',
-          threeDsRedirectUrl: data.Data.Url,
-          posTransactionToken: data.Data.CodeForHash || req.paymentId,
-        };
+      if (data.IsSuccessful) {
+        // MOTO transactions complete immediately — no 3DS redirect
+        if (req.isMoto) {
+          this.logResponse('initiateProvision', requestId, true, {
+            payment_id: req.paymentId,
+            channel: 'MOTO',
+          });
+          return {
+            status: 'completed',
+            posReference: req.paymentId,
+            message: 'Moka MOTO transaction completed',
+            posTransactionToken: data.Data?.CodeForHash || req.paymentId,
+          };
+        }
+        if (data.Data?.Url) {
+          this.logResponse('initiateProvision', requestId, true, {
+            payment_id: req.paymentId,
+            has_url: true,
+          });
+          return {
+            status: 'requires_3ds',
+            posReference: null,
+            message: 'Moka 3DS URL ready — redirect user',
+            threeDsRedirectUrl: data.Data.Url,
+            posTransactionToken: data.Data.CodeForHash || req.paymentId,
+          };
+        }
       }
 
       const failMsg = mapMokaResultCode(data.ResultCode, data.ResultMessage);
