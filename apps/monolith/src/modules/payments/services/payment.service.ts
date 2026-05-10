@@ -399,6 +399,9 @@ export class PaymentService {
         if (locked.auctionId) {
           await this.createDepositAndParticipant(qr2.manager, locked);
         }
+
+        // ── Referral reward: first successful payment by an invited user ──
+        await this.tryGrantReferralReward(qr2.manager, locked);
       } else {
         locked.status = PaymentStatus.FAILED;
         await qr2.manager.save(Payment, locked);
@@ -794,6 +797,63 @@ export class PaymentService {
 
     const [data, total] = await qb.getManyAndCount();
     return { data, meta: { total, page, limit } };
+  }
+
+  /**
+   * Grant referral credits when a referred user makes their first successful
+   * payment. Idempotent — duplicate inserts are absorbed by the unique index
+   * on (user_id, source_user_id, trigger_event).
+   */
+  private async tryGrantReferralReward(
+    manager: import('typeorm').EntityManager,
+    payment: Payment,
+  ): Promise<void> {
+    try {
+      const user = await manager.query<{ referred_by: string | null }[]>(
+        'SELECT referred_by FROM auth.users WHERE id = $1',
+        [payment.userId],
+      );
+      const referrerId = user?.[0]?.referred_by;
+      if (!referrerId) return;
+
+      const REFEREE_AMOUNT = 250;
+      const REFERRER_AMOUNT = 250;
+      const TRIGGER = 'first_deposit';
+      const expiresAt = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+
+      // ON CONFLICT DO NOTHING — idempotent grant
+      await manager.query(
+        `INSERT INTO crm.referral_credits
+           (user_id, source_user_id, type, amount, currency, status, trigger_event, trigger_payment_id, expires_at, notes)
+         VALUES
+           ($1, $1, 'discount', $2, 'TRY', 'available', $3, $4, $5, 'İlk depozit kuponu (paylaş-kazan)'),
+           ($6, $1, 'discount', $7, 'TRY', 'available', $3, $4, $5, 'Davet ettiğiniz kullanıcı ilk depozit ödemesini yaptı')
+         ON CONFLICT (user_id, source_user_id, trigger_event) DO NOTHING`,
+        [
+          payment.userId,
+          REFEREE_AMOUNT.toFixed(2),
+          TRIGGER,
+          payment.id,
+          expiresAt,
+          referrerId,
+          REFERRER_AMOUNT.toFixed(2),
+        ],
+      );
+
+      this.logger.log(
+        JSON.stringify({
+          event: 'referral_reward_check',
+          referee: payment.userId,
+          referrer: referrerId,
+          payment_id: payment.id,
+        }),
+      );
+    } catch (err) {
+      // Non-fatal: log and continue
+      this.logger.warn(
+        `Referral grant failed for payment ${payment.id}: ${(err as Error).message}`,
+      );
+    }
   }
 
   // ── Mail Order (admin-only) ────────────────────────────────

@@ -5,7 +5,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import {
-  User, Heart, FileText, Gavel, CreditCard, Search, Bell,
+  User, Heart, FileText, Gavel, CreditCard, Search, Bell, Gift,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -16,6 +16,7 @@ const profileNavItems: Array<{ href: string; label: string; icon: LucideIcon }> 
   { href: '/profile/auctions', label: 'İhale Geçmişim', icon: Gavel },
   { href: '/profile/payments', label: 'Ödeme Geçmişim', icon: CreditCard },
   { href: '/profile/installments', label: 'Taksitlerim', icon: CreditCard },
+  { href: '/profile/referral', label: 'Davet & Kazanç', icon: Gift },
   { href: '/profile/saved-searches', label: 'Kayıtlı Aramalar', icon: Search },
   { href: '/profile/notifications', label: 'Bildirim Ayarları', icon: Bell },
 ];

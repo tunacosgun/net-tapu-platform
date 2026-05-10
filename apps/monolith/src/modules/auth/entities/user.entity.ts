@@ -50,6 +50,12 @@ export class User {
   @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
   lastLoginAt!: Date | null;
 
+  @Column({ name: 'referral_code', type: 'varchar', length: 12, nullable: true, unique: true })
+  referralCode!: string | null;
+
+  @Column({ name: 'referred_by', type: 'uuid', nullable: true })
+  referredBy!: string | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

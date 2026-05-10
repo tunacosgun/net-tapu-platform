@@ -1,7 +1,7 @@
 'use client';
 
-import { Suspense, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -58,10 +58,24 @@ function AppleIcon() {
 
 function RegisterContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const s = useSiteSettings();
+
+  const refCode = (searchParams?.get('ref') || '').trim().toUpperCase();
+  const [refValid, setRefValid] = useState<{ inviterName?: string } | null>(null);
+
+  useEffect(() => {
+    if (!refCode) return;
+    apiClient
+      .post<{ valid: boolean; inviterName?: string }>('/referral/validate', { code: refCode })
+      .then((r) => {
+        if (r.data.valid) setRefValid({ inviterName: r.data.inviterName });
+      })
+      .catch(() => {});
+  }, [refCode]);
 
   const {
     register,
@@ -78,6 +92,7 @@ function RegisterContent() {
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone,
+        ...(refCode ? { referralCode: refCode } : {}),
       });
       router.push('/login?registered=true');
     } catch (err) {
@@ -158,6 +173,25 @@ function RegisterContent() {
             <span className="text-sm text-slate-400 font-medium">veya</span>
             <div className="flex-1 h-px bg-slate-200"></div>
           </div>
+
+          {/* Referral Banner */}
+          {refValid && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-6 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-amber-50 p-4 flex items-center gap-3"
+            >
+              <span className="text-2xl">🎁</span>
+              <div className="text-sm">
+                <p className="font-semibold text-emerald-900">
+                  {refValid.inviterName ? `${refValid.inviterName} sizi davet etti!` : 'Davet kodu geçerli'}
+                </p>
+                <p className="text-xs text-emerald-700">
+                  Kayıt olup ilk depozit ödemesini yaptığınızda 250 TL'lik indirim kuponu kazanırsınız.
+                </p>
+              </div>
+            </motion.div>
+          )}
 
           {/* Error Alert */}
           {serverError && (

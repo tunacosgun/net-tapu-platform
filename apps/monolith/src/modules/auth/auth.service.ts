@@ -58,6 +58,7 @@ export class AuthService {
     firstName: string;
     lastName: string;
     phone?: string;
+    referralCode?: string;
   }) {
     const existingEmail = await this.userRepo.findOne({
       where: { email: dto.email },
@@ -74,6 +75,16 @@ export class AuthService {
       throw new ConflictException('Bu kullanıcı adı zaten alınmış');
     }
 
+    // Look up the inviter BEFORE creating the new user (no self-ref possible)
+    let inviterId: string | null = null;
+    if (dto.referralCode) {
+      const code = dto.referralCode.trim().toUpperCase();
+      const inviter = await this.userRepo.findOne({
+        where: { referralCode: code },
+      });
+      if (inviter) inviterId = inviter.id;
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
 
     const user = this.userRepo.create({
@@ -83,6 +94,7 @@ export class AuthService {
       firstName: dto.firstName,
       lastName: dto.lastName,
       phone: dto.phone ?? null,
+      referredBy: inviterId,
     });
     await this.userRepo.save(user);
 
