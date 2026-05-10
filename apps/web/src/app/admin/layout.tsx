@@ -162,7 +162,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       )}
 
       {/* Desktop sidebar */}
-      <aside className="hidden w-56 shrink-0 border-r border-[var(--border)] bg-[var(--background)] lg:flex flex-col overflow-y-auto">
+      <aside
+        data-tour="admin-sidebar"
+        className="hidden w-56 shrink-0 border-r border-[var(--border)] bg-[var(--background)] lg:flex flex-col overflow-y-auto"
+      >
         <SidebarLogo />
         <div className="flex-1 overflow-y-auto py-4">
           <NavItems pathname={pathname} />

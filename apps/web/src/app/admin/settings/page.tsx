@@ -710,6 +710,56 @@ export default function AdminSettingsPage() {
         <Alert variant="success">Ayarlar başarıyla kaydedildi.</Alert>
       )}
 
+      {/* ── Sistem Tanıtıcısı (Tour) ── */}
+      <Card className="p-6" data-tour="settings-tour-toggle">
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-lg">🎯</span>
+          <div>
+            <h2 className="text-lg font-semibold">Sistem Tanıtıcısı</h2>
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Ziyaretçi ve admin sayfalarında interaktif tur (sağ alttaki "?" butonu + ilk ziyarette otomatik açılış).
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={(settings.tour_enabled ?? 'true') !== 'false'}
+              onChange={(e) =>
+                updateSetting('tour_enabled', e.target.checked ? 'true' : 'false')
+              }
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+            />
+            <div>
+              <span className="text-sm font-medium">Sistem tanıtıcısını aç</span>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Kapatıldığında her sayfadaki "?" butonu ve otomatik açılış gizlenir.
+              </p>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={(settings.tour_auto_start ?? 'true') !== 'false'}
+              disabled={(settings.tour_enabled ?? 'true') === 'false'}
+              onChange={(e) =>
+                updateSetting('tour_auto_start', e.target.checked ? 'true' : 'false')
+              }
+              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-500 focus:ring-brand-500 disabled:opacity-50"
+            />
+            <div>
+              <span className="text-sm font-medium">Yeni ziyaretçi için otomatik başlat</span>
+              <p className="text-xs text-[var(--muted-foreground)]">
+                Her sayfanın ilk ziyaretinde tur otomatik açılır. Kullanıcı "Bir daha gösterme" derse kapanır.
+              </p>
+            </div>
+          </label>
+        </div>
+      </Card>
+
       {/* ── Logo & Branding Section ── */}
       <Card className="p-6">
         <div className="flex items-center gap-2 mb-4">

@@ -420,7 +420,7 @@ export default function AdminParcelsPage() {
         <div className="flex-1" />
 
         {selectedIds.size > 0 && (
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center" data-tour="admin-parcels-bulk">
             <span className="text-sm text-[var(--muted-foreground)]">{selectedIds.size} seçili</span>
             <Button size="sm" variant="secondary" onClick={() => setShowBulkPrice(true)}>
               Toplu Fiyat Güncelle
@@ -429,7 +429,7 @@ export default function AdminParcelsPage() {
         )}
 
         <div className="flex gap-2">
-          <div className="relative group">
+          <div className="relative group" data-tour="admin-parcels-export">
             <Button size="sm" variant="secondary">
               Dışa Aktar ▾
             </Button>
@@ -448,7 +448,12 @@ export default function AdminParcelsPage() {
               </button>
             </div>
           </div>
-          <Button size="sm" variant="secondary" onClick={() => setShowImport(true)}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setShowImport(true)}
+            data-tour="admin-parcels-import"
+          >
             İçe Aktar
           </Button>
         </div>

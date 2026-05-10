@@ -11,6 +11,7 @@ import { fetchSiteSettingsServer } from '@/lib/server-api';
 import { OrganizationJsonLd, WebSiteJsonLd, RealEstateAgentJsonLd } from '@/components/json-ld';
 import { GoogleOneTap } from '@/components/google-one-tap';
 import { ScrollToTop } from '@/components/ui/scroll-to-top';
+import { TourEngine } from '@/components/tour-engine';
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav';
 import { Toaster } from 'sonner';
 import './globals.css';
@@ -107,6 +108,7 @@ export default function RootLayout({
               <Toaster position="top-right" richColors closeButton />
               <ScrollToTop />
               <GoogleOneTap />
+              <TourEngine />
             </SiteSettingsProvider>
           </AuthProvider>
         </ErrorBoundary>

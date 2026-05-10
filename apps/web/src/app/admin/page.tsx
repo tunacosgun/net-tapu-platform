@@ -80,7 +80,7 @@ export default function AdminDashboard() {
 
       {/* Alerts */}
       {hasAlerts && (
-        <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 space-y-2">
+        <div data-tour="admin-alerts" className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 space-y-2">
           <div className="flex items-center gap-2 text-yellow-800 font-semibold text-sm">
             <AlertTriangle className="h-4 w-4" />
             Dikkat Gerektiren İşlemler
@@ -106,7 +106,7 @@ export default function AdminDashboard() {
       )}
 
       {/* KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div data-tour="admin-kpis" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard
           icon={Map}
           label="Aktif İlanlar"
